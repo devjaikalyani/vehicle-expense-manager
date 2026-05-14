@@ -98,16 +98,16 @@ export default function TripHistory() {
 
   return (
     <div>
-      <div className="page-header">
+      <div className="gradient-header">
         <h1>Trip History</h1>
         <p>All submitted trips and their approval status</p>
       </div>
 
       <div className="stats-grid">
-        <div className="stat-card"><div className="stat-value">{filtered.length}</div><div className="stat-label">Trips</div></div>
-        <div className="stat-card"><div className="stat-value">{fmt(totalKm)}</div><div className="stat-label">Total KM</div></div>
-        <div className="stat-card"><div className="stat-value">{fmtINR(totalExp)}</div><div className="stat-label">Claimed</div></div>
-        <div className="stat-card"><div className="stat-value" style={{ color: '#16a34a' }}>{fmtINR(approvedExp)}</div><div className="stat-label">Approved</div></div>
+        <div className="stat-card" style={{ borderTop: '3px solid #3b82f6' }}><div className="stat-value">{filtered.length}</div><div className="stat-label">Trips</div></div>
+        <div className="stat-card" style={{ borderTop: '3px solid #06b6d4' }}><div className="stat-value" style={{ color: '#0891b2' }}>{fmt(totalKm)}</div><div className="stat-label">Total KM</div></div>
+        <div className="stat-card" style={{ borderTop: '3px solid #8b5cf6' }}><div className="stat-value" style={{ color: '#7c3aed' }}>{fmtINR(totalExp)}</div><div className="stat-label">Claimed</div></div>
+        <div className="stat-card" style={{ borderTop: '3px solid #16a34a' }}><div className="stat-value" style={{ color: '#16a34a' }}>{fmtINR(approvedExp)}</div><div className="stat-label">Approved</div></div>
       </div>
 
       <div className="card">
@@ -131,7 +131,8 @@ export default function TripHistory() {
             <div key={trip.id}>
               {i > 0 && <hr className="trip-divider" />}
               <div
-                style={{ padding: '0.85rem 0', cursor: 'pointer' }}
+                className={`trip-item trip-item-${trip.status}`}
+                style={{ cursor: 'pointer' }}
                 onClick={() => setExpanded(expanded === trip.id ? null : trip.id)}
               >
                 <div className="trip-row">

@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Navbar from './components/Navbar';
+import BottomNav from './components/BottomNav';
 import Login from './pages/Login';
 import EmployeeDashboard from './pages/EmployeeDashboard';
 import ActiveTrip from './pages/ActiveTrip';
@@ -15,6 +16,7 @@ function Layout() {
       <main className="main-content">
         <Outlet />
       </main>
+      <BottomNav />
     </div>
   );
 }

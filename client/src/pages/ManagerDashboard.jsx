@@ -2,8 +2,25 @@ import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 
 function fmt(n) { return parseFloat(n || 0).toFixed(1); }
-function fmtINR(n) { return 'Rs.' + parseFloat(n || 0).toFixed(0); }
+function fmtINR(n) { return '₹' + parseFloat(n || 0).toFixed(0); }
 function fmtDate(d) { return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }); }
+
+function avatarBg(name) {
+  const colors = ['#667eea', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#06b6d4', '#f5576c'];
+  return colors[(name || '').charCodeAt(0) % colors.length];
+}
+
+function Avatar({ name, size = 36 }) {
+  const initials = (name || '?').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: '50%',
+      background: avatarBg(name),
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      color: 'white', fontSize: size * 0.36, fontWeight: '700', flexShrink: 0,
+    }}>{initials}</div>
+  );
+}
 
 // ── Action confirmation modal ────────────────────────────────────────────────
 function ActionModal({ trip, action, onConfirm, onCancel }) {
@@ -216,36 +233,42 @@ export default function ManagerDashboard() {
 
   return (
     <div>
-      <div className="page-header">
+      <div className="gradient-header">
         <h1>Manager Dashboard</h1>
         <p>Review claims, manage employees, vehicles, and reports</p>
       </div>
 
       {/* Summary stats */}
       <div className="stats-grid">
-        <div className="stat-card" style={{ borderTop: pendingCount > 0 ? '3px solid #f59e0b' : undefined }}>
-          <div className="stat-value" style={{ color: pendingCount > 0 ? '#d97706' : '#1e40af' }}>{pendingCount}</div>
+        <div className={`stat-card ${pendingCount > 0 ? 'stat-card-amber' : 'stat-card-indigo'}`}>
+          <div className="stat-value">{pendingCount}</div>
           <div className="stat-label">Pending Review</div>
         </div>
-        <div className="stat-card">
-          <div className="stat-value" style={{ color: '#16a34a' }}>{fmtINR(approvedTotal)}</div>
+        <div className="stat-card stat-card-emerald">
+          <div className="stat-value">{fmtINR(approvedTotal)}</div>
           <div className="stat-label">Approved Total</div>
         </div>
-        <div className="stat-card">
+        <div className="stat-card stat-card-ocean">
           <div className="stat-value">{fmt(totalKmApproved)}</div>
           <div className="stat-label">Approved KM</div>
         </div>
-        <div className="stat-card">
+        <div className="stat-card stat-card-indigo">
           <div className="stat-value">{employees.length}</div>
           <div className="stat-label">Employees</div>
         </div>
       </div>
 
       {/* Tab navigation */}
-      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
-        {['trips', 'employees', 'vehicles', 'reports'].map(t => (
-          <button key={t} onClick={() => setTab(t)} className={`pill ${tab === t ? 'pill-active' : 'pill-inactive'}`} style={{ textTransform: 'capitalize' }}>
-            {t}{t === 'trips' && pendingCount > 0 ? ` (${pendingCount})` : ''}
+      <div className="tabs">
+        {[
+          { key: 'trips', label: 'Trips' },
+          { key: 'employees', label: 'Employees' },
+          { key: 'vehicles', label: 'Vehicles' },
+          { key: 'reports', label: 'Reports' },
+        ].map(({ key, label }) => (
+          <button key={key} onClick={() => setTab(key)} className={`tab-btn ${tab === key ? 'tab-active' : ''}`}>
+            {label}
+            {key === 'trips' && pendingCount > 0 && <span className="tab-badge">{pendingCount}</span>}
           </button>
         ))}
       </div>
@@ -296,40 +319,38 @@ export default function ManagerDashboard() {
             filtered.map((trip, i) => (
               <div key={trip.id}>
                 {i > 0 && <hr className="trip-divider" />}
-                <div style={{ padding: '0.85rem 0' }}>
-                  <div className="trip-row">
-                    {/* Checkbox for pending trips */}
-                    <div style={{ paddingTop: '2px' }}>
-                      {trip.status === 'pending' && (
+                <div className={`trip-item trip-item-${trip.status}`}>
+                  <div className="trip-row" style={{ alignItems: 'flex-start' }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', flex: 1, minWidth: 0 }}>
+                      {trip.status === 'pending' ? (
                         <input
                           type="checkbox"
                           checked={selected.has(trip.id)}
                           onChange={() => toggleSelect(trip.id)}
-                          style={{ width: 'auto', cursor: 'pointer', marginRight: '0.5rem' }}
+                          style={{ width: 'auto', cursor: 'pointer', marginTop: '3px', accentColor: 'var(--brand-1)' }}
                         />
-                      )}
-                    </div>
-
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: '700', color: '#0f172a' }}>
-                        {trip.employee_name}
-                        <span style={{ fontWeight: '400', color: '#64748b', fontSize: '0.82rem' }}> · {trip.employee_code}</span>
+                      ) : <div style={{ width: 16, flexShrink: 0 }} />}
+                      <Avatar name={trip.employee_name} size={36} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: '700', color: 'var(--text)', fontSize: '0.95rem' }}>
+                          {trip.employee_name}
+                          {trip.employee_code && <span style={{ fontWeight: '500', color: 'var(--text-muted)', fontSize: '0.8rem', marginLeft: '0.4rem' }}>· {trip.employee_code}</span>}
+                        </div>
+                        <div style={{ color: 'var(--text-2)', fontSize: '0.875rem', margin: '0.15rem 0' }}>{trip.purpose || 'Trip'}</div>
+                        <div className="trip-meta">
+                          <span>{fmtDate(trip.start_time)}</span>
+                          {trip.vehicle_name && <span>{trip.vehicle_name}</span>}
+                          {trip.manual_distance_km != null && <span>Odo: {fmt(trip.manual_distance_km)} km</span>}
+                          {trip.gps_distance_km != null && <span>GPS: {fmt(trip.gps_distance_km)} km</span>}
+                          {parseFloat(trip.fuel_expense_amount || 0) > 0 && <span>Fuel: {fmtINR(trip.fuel_expense_amount)}</span>}
+                          <span style={{ fontWeight: '700', color: 'var(--brand-1)' }}>{fmtINR(trip.expense_amount)}</span>
+                        </div>
+                        {trip.manager_notes && (
+                          <div style={{ marginTop: '0.3rem', fontSize: '0.78rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>Note: {trip.manager_notes}</div>
+                        )}
                       </div>
-                      <div style={{ color: '#1e293b', margin: '0.15rem 0' }}>{trip.purpose || 'Trip'}</div>
-                      <div className="trip-meta">
-                        <span>{fmtDate(trip.start_time)}</span>
-                        {trip.vehicle_name && <span>{trip.vehicle_name} · {trip.vehicle_type?.replace('_', '-')}</span>}
-                        {trip.manual_distance_km != null && <span>Odo: {fmt(trip.manual_distance_km)} km</span>}
-                        {trip.gps_distance_km != null && <span>GPS: {fmt(trip.gps_distance_km)} km</span>}
-                        {parseFloat(trip.fuel_expense_amount || 0) > 0 && <span>Fuel: {fmtINR(trip.fuel_expense_amount)}</span>}
-                        <span style={{ fontWeight: '700', color: '#1e40af' }}>{fmtINR(trip.expense_amount)}</span>
-                      </div>
-                      {trip.manager_notes && (
-                        <div style={{ marginTop: '0.3rem', fontSize: '0.8rem', color: '#64748b', fontStyle: 'italic' }}>Note: {trip.manager_notes}</div>
-                      )}
                     </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.4rem' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.4rem', flexShrink: 0 }}>
                       <span className={`badge badge-${trip.status}`}>{trip.status}</span>
                       {trip.status === 'pending' && (
                         <div style={{ display: 'flex', gap: '0.35rem' }}>

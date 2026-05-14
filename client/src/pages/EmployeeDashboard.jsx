@@ -3,14 +3,38 @@ import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
 
-function StatusBadge({ status }) {
-  return <span className={`badge badge-${status}`}>{status}</span>;
-}
-
 function fmt(n) { return parseFloat(n || 0).toFixed(1); }
 function fmtINR(n) { return '₹' + parseFloat(n || 0).toFixed(0); }
 function fmtDate(d) {
   return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function avatarColor(name) {
+  const colors = ['#667eea', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#06b6d4', '#f5576c'];
+  return colors[(name || '').charCodeAt(0) % colors.length];
+}
+
+function Avatar({ name, size = 38 }) {
+  const initials = (name || '?').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: '50%',
+      background: avatarColor(name),
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      color: 'white', fontSize: size * 0.38, fontWeight: '700', flexShrink: 0,
+    }}>
+      {initials}
+    </div>
+  );
+}
+
+function StatCard({ value, label, gradClass }) {
+  return (
+    <div className={`stat-card ${gradClass}`}>
+      <div className="stat-value">{value}</div>
+      <div className="stat-label">{label}</div>
+    </div>
+  );
 }
 
 export default function EmployeeDashboard() {
@@ -78,8 +102,7 @@ export default function EmployeeDashboard() {
 
   const completedTrips = trips.filter(t => t.status !== 'active');
   const thisMonthTrips = completedTrips.filter(t => {
-    const d = new Date(t.start_time);
-    const now = new Date();
+    const d = new Date(t.start_time), now = new Date();
     return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
   });
   const totalKm = completedTrips.reduce((s, t) => s + parseFloat(t.manual_distance_km || t.gps_distance_km || 0), 0);
@@ -88,159 +111,158 @@ export default function EmployeeDashboard() {
 
   return (
     <div>
-      <div className="page-header">
-        <h1>Welcome back, {user.name.split(' ')[0]}</h1>
-        <p>
-          {user.employee_code && <strong>{user.employee_code} · </strong>}
-          {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}
-        </p>
+      {/* Welcome header */}
+      <div className="gradient-header">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', position: 'relative', zIndex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <Avatar name={user.name} size={48} />
+            <div>
+              <h1 style={{ fontSize: '1.3rem' }}>Welcome back, {user.name.split(' ')[0]}</h1>
+              <p>
+                {user.employee_code && <span style={{ fontWeight: '600', color: 'rgba(255,255,255,0.75)', marginRight: '0.5rem' }}>{user.employee_code}</span>}
+                {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}
+              </p>
+            </div>
+          </div>
+          {!activeTrip && (
+            <button
+              className="btn"
+              style={{ background: 'rgba(255,255,255,0.12)', color: 'white', border: '1px solid rgba(255,255,255,0.25)', backdropFilter: 'blur(8px)' }}
+              onClick={() => setShowForm(true)}
+            >
+              + Start Trip
+            </button>
+          )}
+          {activeTrip && (
+            <button
+              className="btn"
+              style={{ background: 'rgba(239,68,68,0.85)', color: 'white', border: '1px solid rgba(239,68,68,0.5)', backdropFilter: 'blur(8px)' }}
+              onClick={() => navigate('/trip/active')}
+            >
+              Trip in Progress →
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Quick stats */}
+      {/* Stat cards */}
       <div className="stats-grid">
-        <div className="stat-card">
-          <div className="stat-value">{fmt(totalKm)}</div>
-          <div className="stat-label">Total KM</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-value">{fmtINR(totalExp)}</div>
-          <div className="stat-label">Total Claimed</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-value" style={{ color: pendingAmt > 0 ? '#d97706' : '#16a34a' }}>{fmtINR(pendingAmt)}</div>
-          <div className="stat-label">Pending Approval</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-value">{thisMonthTrips.length}</div>
-          <div className="stat-label">Trips This Month</div>
-        </div>
+        <StatCard value={fmt(totalKm)} label="Total KM" gradClass="stat-card-indigo" />
+        <StatCard value={fmtINR(totalExp)} label="Total Claimed" gradClass="stat-card-ocean" />
+        <StatCard
+          value={fmtINR(pendingAmt)}
+          label="Pending"
+          gradClass={pendingAmt > 0 ? 'stat-card-amber' : 'stat-card-emerald'}
+        />
+        <StatCard value={thisMonthTrips.length} label="This Month" gradClass="stat-card-indigo" />
       </div>
 
       {/* Active trip banner */}
       {activeTrip && (
         <div className="alert alert-info" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
           <span>
-            <strong>Trip in progress</strong> — {activeTrip.purpose || 'Unnamed trip'} started at{' '}
+            <strong>Trip in progress</strong> — {activeTrip.purpose || 'Unnamed trip'}, started{' '}
             {new Date(activeTrip.start_time).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
           </span>
-          <button className="btn btn-danger btn-sm" onClick={() => navigate('/trip/active')}>
-            Open Active Trip →
-          </button>
+          <button className="btn btn-danger btn-sm" onClick={() => navigate('/trip/active')}>Open →</button>
         </div>
       )}
 
-      {/* Start trip card */}
-      {!activeTrip && (
-        <div className="card">
-          <h2 style={{ fontSize: '1rem', fontWeight: '700', marginBottom: '0.75rem', color: '#0f172a' }}>
-            Start a New Trip
-          </h2>
-          {!showForm ? (
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-              <button className="btn btn-primary" onClick={() => setShowForm(true)}>
-                + Start Trip
-              </button>
-              <Link to="/trips" className="btn btn-ghost">View History</Link>
-            </div>
-          ) : (
-            <form onSubmit={startTrip}>
-              {error && <div className="alert alert-error">{error}</div>}
-              {gpsStatus && <div className="alert alert-info">{gpsStatus}</div>}
-
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0 1rem' }}>
-                <div className="form-group">
-                  <label>Vehicle</label>
-                  <select value={form.vehicle_id} onChange={e => setForm({ ...form, vehicle_id: e.target.value })}>
-                    <option value="">No vehicle / select later</option>
-                    {vehicles.map(v => (
-                      <option key={v.id} value={v.id}>
-                        {v.name} · {v.registration_number} ({v.type?.replace('_', '-')})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label>Start Odometer (km) — optional</label>
-                  <input
-                    type="number"
-                    value={form.start_odometer}
-                    onChange={e => setForm({ ...form, start_odometer: e.target.value })}
-                    placeholder="e.g. 12500"
-                    min="0"
-                    step="0.1"
-                  />
-                </div>
-              </div>
-
+      {/* Start trip form */}
+      {!activeTrip && showForm && (
+        <div className="card" style={{ borderTop: '3px solid #667eea' }}>
+          <div className="section-header">
+            <span className="section-title">New Trip</span>
+            <button className="btn btn-ghost btn-sm" onClick={() => { setShowForm(false); setError(''); }}>Cancel</button>
+          </div>
+          <form onSubmit={startTrip}>
+            {error && <div className="alert alert-error">{error}</div>}
+            {gpsStatus && <div className="alert alert-info">{gpsStatus}</div>}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0 1rem' }}>
               <div className="form-group">
-                <label>Purpose / Destination *</label>
-                <input
-                  value={form.purpose}
-                  onChange={e => setForm({ ...form, purpose: e.target.value })}
-                  placeholder="e.g. Client visit — ABC Pumps, Nagpur"
-                  required
-                />
+                <label>Vehicle</label>
+                <select value={form.vehicle_id} onChange={e => setForm({ ...form, vehicle_id: e.target.value })}>
+                  <option value="">No vehicle / select later</option>
+                  {vehicles.map(v => (
+                    <option key={v.id} value={v.id}>{v.name} · {v.registration_number} ({v.type?.replace('_', '-')})</option>
+                  ))}
+                </select>
               </div>
-
-              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                <button type="submit" className="btn btn-success" disabled={loading}>
-                  {loading ? gpsStatus || 'Starting...' : 'Start Trip'}
-                </button>
-                <button type="button" className="btn btn-ghost" onClick={() => { setShowForm(false); setError(''); }}>
-                  Cancel
-                </button>
+              <div className="form-group">
+                <label>Start Odometer (km) — optional</label>
+                <input type="number" value={form.start_odometer} onChange={e => setForm({ ...form, start_odometer: e.target.value })} placeholder="e.g. 12500" min="0" step="0.1" />
               </div>
-            </form>
-          )}
+            </div>
+            <div className="form-group">
+              <label>Purpose / Destination *</label>
+              <input value={form.purpose} onChange={e => setForm({ ...form, purpose: e.target.value })} placeholder="e.g. Client visit — ABC Pumps, Nagpur" required />
+            </div>
+            <button type="submit" className="btn btn-success" style={{ width: '100%', padding: '0.85rem' }} disabled={loading}>
+              {loading ? gpsStatus || 'Starting...' : 'Start Trip'}
+            </button>
+          </form>
         </div>
       )}
 
       {/* Manager shortcut */}
       {isManager && (
-        <div className="card" style={{ background: '#eff6ff', border: '1px solid #bfdbfe' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-            <div>
-              <div style={{ fontWeight: '700', color: '#1e40af' }}>Manager Console</div>
-              <div style={{ fontSize: '0.82rem', color: '#3b82f6' }}>Review pending trip claims and live map</div>
-            </div>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <Link to="/manager" className="btn btn-primary btn-sm">Dashboard</Link>
-              <Link to="/live-map" className="btn btn-outline btn-sm">Live Map</Link>
-            </div>
+        <div style={{
+          background: 'linear-gradient(135deg, #1a1040, #2d1b69)',
+          borderRadius: '18px',
+          padding: '1.1rem 1.35rem',
+          marginBottom: '1.1rem',
+          border: '1px solid rgba(139,92,246,0.2)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '0.75rem',
+          boxShadow: '0 4px 24px rgba(0,0,0,0.15)',
+        }}>
+          <div>
+            <div style={{ fontWeight: '700', color: '#c4b5fd', fontSize: '0.95rem' }}>Manager Console</div>
+            <div style={{ fontSize: '0.82rem', color: 'rgba(196,181,253,0.6)', marginTop: '0.1rem' }}>Review pending claims and live map</div>
+          </div>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <Link to="/manager" className="btn btn-sm" style={{ background: 'rgba(139,92,246,0.25)', color: '#c4b5fd', border: '1px solid rgba(139,92,246,0.3)' }}>Dashboard</Link>
+            <Link to="/live-map" className="btn btn-sm" style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.7)', border: '1px solid rgba(255,255,255,0.12)' }}>Live Map</Link>
           </div>
         </div>
       )}
 
       {/* Recent trips */}
       <div className="card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem' }}>
-          <h2 style={{ fontSize: '1rem', fontWeight: '700' }}>Recent Trips</h2>
-          <Link to="/trips" style={{ color: '#1e40af', textDecoration: 'none', fontSize: '0.85rem', fontWeight: '600' }}>
-            View all →
-          </Link>
+        <div className="section-header">
+          <span className="section-title">Recent Trips</span>
+          <Link to="/trips" style={{ color: 'var(--brand-1)', textDecoration: 'none', fontSize: '0.82rem', fontWeight: '600' }}>View all →</Link>
         </div>
 
         {completedTrips.length === 0 ? (
-          <p style={{ color: '#94a3b8', fontSize: '0.875rem', textAlign: 'center', padding: '1.5rem 0' }}>
-            No trips yet. Start your first trip above.
-          </p>
+          <div className="empty-state">
+            <div className="empty-state-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#9190a4" strokeWidth="1.5">
+                <path d="M9 20l-5.447-2.724A1 1 0 0 1 3 16.382V5.618a1 1 0 0 1 1.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0 0 21 18.382V7.618a1 1 0 0 0-.553-.894L15 4m0 13V4m0 0L9 7" />
+              </svg>
+            </div>
+            <p>No trips yet. Start your first trip above.</p>
+          </div>
         ) : (
           completedTrips.map((trip, i) => (
             <div key={trip.id}>
               {i > 0 && <hr className="trip-divider" />}
-              <div className="trip-row" style={{ padding: '0.7rem 0' }}>
+              <div className={`trip-row trip-item trip-item-${trip.status}`}>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: '600', color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <div style={{ fontWeight: '600', color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {trip.purpose || 'Trip'}
                   </div>
                   <div className="trip-meta">
                     <span>{fmtDate(trip.start_time)}</span>
                     {trip.vehicle_name && <span>{trip.vehicle_name}</span>}
                     <span>{fmt(trip.manual_distance_km || trip.gps_distance_km)} km</span>
-                    <span style={{ fontWeight: '700', color: '#1e40af' }}>{fmtINR(trip.expense_amount)}</span>
+                    <span style={{ fontWeight: '700', color: 'var(--brand-1)' }}>{fmtINR(trip.expense_amount)}</span>
                   </div>
                 </div>
-                <StatusBadge status={trip.status} />
+                <span className={`badge badge-${trip.status}`}>{trip.status}</span>
               </div>
             </div>
           ))
