@@ -1,0 +1,224 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #f1f5f9;
+  color: #1e293b;
+  -webkit-font-smoothing: antialiased;
+}
+
+.app { min-height: 100vh; display: flex; flex-direction: column; }
+
+.main-content {
+  flex: 1;
+  padding: 1rem;
+  max-width: 960px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* ── Navbar ── */
+.navbar {
+  background: #1e40af;
+  color: white;
+  padding: 0.7rem 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+.navbar-brand { font-size: 1rem; font-weight: 700; letter-spacing: -0.02em; }
+.navbar-brand span { opacity: 0.7; font-weight: 400; font-size: 0.85rem; margin-left: 0.4rem; }
+
+.navbar-links { display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap; }
+.navbar-links a {
+  color: rgba(255,255,255,0.85);
+  text-decoration: none;
+  padding: 0.3rem 0.65rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  transition: background 0.15s;
+}
+.navbar-links a:hover { background: rgba(255,255,255,0.15); color: white; }
+
+.navbar-user { color: #93c5fd; font-size: 0.82rem; padding: 0 0.3rem; }
+
+.btn-logout {
+  background: rgba(255,255,255,0.15);
+  color: white;
+  border: none;
+  padding: 0.3rem 0.7rem;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+.btn-logout:hover { background: rgba(255,255,255,0.25); }
+
+/* ── Cards ── */
+.card {
+  background: white;
+  border-radius: 14px;
+  padding: 1.25rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04);
+  margin-bottom: 1rem;
+}
+
+/* ── Buttons ── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.6rem 1.2rem;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: opacity 0.15s, transform 0.1s;
+  text-decoration: none;
+}
+.btn:hover:not(:disabled) { opacity: 0.88; }
+.btn:active:not(:disabled) { transform: scale(0.98); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.btn-primary  { background: #1e40af; color: white; }
+.btn-success  { background: #16a34a; color: white; }
+.btn-danger   { background: #dc2626; color: white; }
+.btn-warning  { background: #d97706; color: white; }
+.btn-outline  { background: transparent; border: 2px solid #1e40af; color: #1e40af; }
+.btn-ghost    { background: #f1f5f9; color: #475569; }
+.btn-sm       { padding: 0.3rem 0.7rem; font-size: 0.8rem; border-radius: 6px; }
+
+/* ── Forms ── */
+.form-group { margin-bottom: 0.9rem; }
+.form-group label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.3rem;
+  font-size: 0.82rem;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.form-group input,
+.form-group select,
+.form-group textarea {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 0.925rem;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  background: white;
+}
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59,130,246,0.12);
+}
+
+/* ── Stats grid ── */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.stat-card {
+  background: white;
+  border-radius: 12px;
+  padding: 1rem 0.75rem;
+  text-align: center;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+}
+.stat-value { font-size: 1.7rem; font-weight: 800; color: #1e40af; line-height: 1; }
+.stat-label { font-size: 0.75rem; color: #64748b; margin-top: 0.3rem; text-transform: uppercase; letter-spacing: 0.05em; }
+
+/* ── Badges ── */
+.badge {
+  display: inline-block;
+  padding: 0.22rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.badge-active   { background: #dbeafe; color: #1d4ed8; }
+.badge-pending  { background: #fef3c7; color: #92400e; }
+.badge-approved { background: #dcfce7; color: #166534; }
+.badge-rejected { background: #fee2e2; color: #991b1b; }
+.badge-manager  { background: #ede9fe; color: #6d28d9; }
+
+/* ── Alerts ── */
+.alert {
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  margin-bottom: 0.9rem;
+  font-size: 0.875rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.alert-error   { background: #fee2e2; color: #991b1b; border-left: 4px solid #dc2626; }
+.alert-success { background: #dcfce7; color: #166534; border-left: 4px solid #16a34a; }
+.alert-info    { background: #dbeafe; color: #1e40af; border-left: 4px solid #3b82f6; }
+.alert-warn    { background: #fef3c7; color: #92400e; border-left: 4px solid #f59e0b; }
+
+/* ── Map ── */
+.map-container { border-radius: 12px; overflow: hidden; margin-bottom: 1rem; }
+
+/* ── Page headers ── */
+.page-header { margin-bottom: 1.1rem; }
+.page-header h1 { font-size: 1.4rem; font-weight: 800; color: #0f172a; }
+.page-header p  { color: #64748b; font-size: 0.875rem; margin-top: 0.2rem; }
+
+/* ── Trip row ── */
+.trip-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.75rem; }
+.trip-meta { display: flex; gap: 0.75rem; flex-wrap: wrap; font-size: 0.82rem; color: #64748b; margin-top: 0.3rem; }
+.trip-divider { border: none; border-top: 1px solid #f1f5f9; margin: 0; }
+
+/* ── Modal overlay ── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15,23,42,0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 1rem;
+  backdrop-filter: blur(2px);
+}
+
+/* ── Filter pills ── */
+.filter-pills { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.pill {
+  padding: 0.28rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.pill-active   { background: #1e40af; color: white; }
+.pill-inactive { background: #e2e8f0; color: #475569; }
+.pill-inactive:hover { background: #cbd5e1; }
+
+/* ── Responsive ── */
+@media (max-width: 600px) {
+  .main-content { padding: 0.75rem; }
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .navbar-brand span { display: none; }
+}
