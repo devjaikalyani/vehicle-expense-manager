@@ -4,7 +4,7 @@ import axios from 'axios';
 const STATUS_FILTERS = ['all', 'pending', 'approved', 'rejected'];
 
 function fmt(n) { return parseFloat(n || 0).toFixed(1); }
-function fmtINR(n) { return 'Rs.' + parseFloat(n || 0).toFixed(0); }
+function fmtINR(n) { return '₹' + parseFloat(n || 0).toFixed(0); }
 function fmtDate(d) { return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }); }
 function fmtTime(d) { return new Date(d).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }); }
 function duration(start, end) {
@@ -104,10 +104,10 @@ export default function TripHistory() {
       </div>
 
       <div className="stats-grid">
-        <div className="stat-card" style={{ borderTop: '3px solid #3b82f6' }}><div className="stat-value">{filtered.length}</div><div className="stat-label">Trips</div></div>
-        <div className="stat-card" style={{ borderTop: '3px solid #06b6d4' }}><div className="stat-value" style={{ color: '#0891b2' }}>{fmt(totalKm)}</div><div className="stat-label">Total KM</div></div>
-        <div className="stat-card" style={{ borderTop: '3px solid #8b5cf6' }}><div className="stat-value" style={{ color: '#7c3aed' }}>{fmtINR(totalExp)}</div><div className="stat-label">Claimed</div></div>
-        <div className="stat-card" style={{ borderTop: '3px solid #16a34a' }}><div className="stat-value" style={{ color: '#16a34a' }}>{fmtINR(approvedExp)}</div><div className="stat-label">Approved</div></div>
+        <div className="stat-card stat-card-indigo"><div className="stat-value">{filtered.length}</div><div className="stat-label">Trips</div></div>
+        <div className="stat-card stat-card-ocean"><div className="stat-value">{fmt(totalKm)}</div><div className="stat-label">Total KM</div></div>
+        <div className="stat-card stat-card-indigo"><div className="stat-value">{fmtINR(totalExp)}</div><div className="stat-label">Claimed</div></div>
+        <div className="stat-card stat-card-emerald"><div className="stat-value">{fmtINR(approvedExp)}</div><div className="stat-label">Approved</div></div>
       </div>
 
       <div className="card">

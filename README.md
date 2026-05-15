@@ -1,26 +1,72 @@
 # Vehicle Expense Manager
 
-A web + PWA application for tracking employee vehicle trips and expenses via odometer readings and GPS tracking.
+A full-stack web and PWA application for tracking employee vehicle trips, GPS routes, and expense reimbursements. Employees log trips with odometer readings, fuel costs, and receipt photos. Managers review, approve or reject claims, and download monthly PDF reports.
+
+---
 
 ## Features
 
-- Live GPS tracking with real-time map view for managers
-- Odometer-based distance and expense calculation
-- Fuel expense logging (type, liters, amount)
-- Receipt / proof photo uploads
-- Trip approval workflow (approve / reject with notes)
-- Bulk approve or reject trips
-- Monthly expense PDF reports
-- Push notifications for claim status updates
-- Custom per-km reimbursement rates per employee
-- Installable as a mobile PWA
+**Employee**
+- Start and end trips with odometer readings, vehicle, and purpose
+- Live GPS tracking on an interactive map during active trips
+- Log fuel expenses (type, litres, amount) when ending a trip
+- Upload up to 6 receipt photos or PDFs per trip
+- View trip history with status filters and CSV export
+- Receive push notifications when claims are approved or rejected
+- Self-service account setup and password reset via OTP email
+
+**Manager**
+- Review all employee trips with status filters
+- Approve or reject individual trips with optional notes
+- Bulk approve or reject multiple pending trips at once
+- Set custom per-km reimbursement rates per employee
+- Manage employees (add, edit rates) and vehicles (add, assign, delete)
+- Watch a live map of all currently active employee positions
+- Download monthly PDF expense reports
+
+**Authentication**
+- Email and password login with JWT session tokens (7-day expiry)
+- Forgot Password: request OTP by email, verify, set new password
+- Set Up Account: new employees register themselves via OTP — no admin pre-creation required
+
+---
 
 ## Tech Stack
 
-- **Frontend:** React, Vite, Leaflet.js, Socket.io client
-- **Backend:** Node.js, Express, Socket.io
-- **Database:** PostgreSQL
-- **Other:** JWT auth, Multer (file uploads), PDFKit (reports), Web Push (notifications)
+| Layer | Technology |
+|---|---|
+| Frontend | React 18, Vite, React Router, Leaflet.js, Socket.IO client |
+| Backend | Node.js, Express, Socket.IO |
+| Database | PostgreSQL |
+| Auth | JWT (jsonwebtoken), bcryptjs |
+| Email (OTP) | Zoho Mail REST API (OAuth2 refresh token) |
+| File uploads | Multer |
+| PDF reports | PDFKit |
+| Push notifications | Web Push (VAPID) |
+| PWA | Vite Plugin PWA, Workbox |
+
+---
+
+## Project Structure
+
+```
+Vehicle expense Manager/
+├── client/                  # React + Vite frontend
+│   └── src/
+│       ├── pages/           # Login, EmployeeDashboard, ActiveTrip, TripHistory,
+│       │                    # ManagerDashboard, LiveMap, Profile
+│       └── components/      # Navbar, BottomNav
+├── server/                  # Express backend
+│   ├── routes/              # auth, trips, gps, employees, receipts, reports, push
+│   ├── scripts/             # DB setup, seed, VAPID key gen, Zoho token helper
+│   ├── middleware/          # JWT authentication
+│   ├── uploads/             # Receipt files (gitignored)
+│   ├── db.js                # PostgreSQL connection pool
+│   └── index.js             # Server entry point
+└── package.json             # Root: concurrently runs both servers
+```
+
+---
 
 ## Setup
 
@@ -38,37 +84,68 @@ psql -U postgres -d vehicle_expense_manager -f server/scripts/migrate-v2.sql
 cp server/.env.example server/.env
 ```
 
-Edit `server/.env` and fill in:
+Edit `server/.env` with your values:
 
-```
+```env
 DATABASE_URL=postgresql://postgres:yourpassword@localhost:5432/vehicle_expense_manager
-JWT_SECRET=your-random-secret
+JWT_SECRET=your-random-64-char-secret
 PORT=3001
 CLIENT_URL=http://localhost:5173
+
+# Email sender address (shown in From field of OTP emails)
+SMTP_USER=you@yourdomain.com
+
+# Zoho Mail REST API credentials (see section below for setup)
+ZOHO_CLIENT_ID=your-self-client-id
+ZOHO_CLIENT_SECRET=your-self-client-secret
+ZOHO_REFRESH_TOKEN=your-refresh-token
 ```
 
-### 3. Install dependencies
+### 3. Zoho Mail Setup (one-time)
+
+The app sends OTP emails via the Zoho Mail REST API. You need a Zoho Self Client app and a refresh token.
+
+1. Go to [https://api-console.zoho.in](https://api-console.zoho.in) and open your **Self Client** app
+2. Copy the **Client ID** and **Client Secret** into `server/.env`
+3. In the Self Client, click **Generate Code**:
+   - Scope: `ZohoMail.messages.CREATE,ZohoMail.accounts.READ`
+   - Duration: 10 minutes
+   - Click **Create** and copy the code shown
+4. Run the helper script immediately (the code expires in 10 minutes):
+   ```bash
+   cd server
+   node scripts/get-zoho-token.js <paste-code-here>
+   ```
+5. Copy the printed `ZOHO_REFRESH_TOKEN=...` line into `server/.env`
+
+The refresh token does not expire — this is a one-time setup.
+
+### 4. Install dependencies
 
 ```bash
 npm install
 ```
 
-This installs root, server, and client dependencies.
+This installs dependencies for the root, server, and client in one step.
 
-### 4. Seed admin account
+### 5. Seed the admin account
 
 ```bash
 cd server
 node scripts/seed.js
 ```
 
-### 5. (Optional) Enable push notifications
+Creates the default admin/manager account. Check `server/scripts/seed.js` for the default credentials.
+
+### 6. (Optional) Enable push notifications
 
 ```bash
 node server/scripts/gen-vapid.js
 ```
 
-Copy the output keys into `server/.env`.
+Copy the two printed keys into `server/.env` as `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY`.
+
+---
 
 ## Running
 
@@ -76,11 +153,27 @@ Copy the output keys into `server/.env`.
 npm run dev
 ```
 
-Starts both backend (port 3001) and frontend (port 5173) in a single terminal.
+Starts the backend on port `3001` and the frontend on port `5173` in a single terminal.
 
 Open [http://localhost:5173](http://localhost:5173) in your browser.
 
-## Default Reimbursement Rates
+---
+
+## User Roles
+
+| Role | Access |
+|---|---|
+| `employee` | Own trips, profile, push subscriptions |
+| `manager` | All trips, employees, vehicles, live map, reports |
+| `admin` | Same as manager (future: admin-only settings) |
+
+Employees can self-register using "Set Up Account" on the login page. Their role is set to `employee` by default. Promote to manager via a direct DB update or the admin interface when available.
+
+---
+
+## Reimbursement Rates
+
+Default rates applied when no custom rate is set for an employee:
 
 | Vehicle Type | Rate |
 |---|---|
@@ -88,4 +181,85 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 | Four-wheeler | Rs. 12 / km |
 | Other | Rs. 8 / km |
 
-Rates can be overridden per employee from the Manager dashboard.
+Managers can override the rate per employee from the Employees tab in the Manager Dashboard. Setting it back to blank restores the vehicle-type default.
+
+**Distance used for calculation:** Odometer reading (end − start) is preferred. If no end odometer is entered, GPS haversine distance from tracked coordinates is used as fallback.
+
+**Total expense formula:** `(distance km × rate per km) + fuel amount`
+
+---
+
+## API Reference
+
+### Auth — `/api/auth`
+
+| Method | Path | Description |
+|---|---|---|
+| POST | `/login` | Email + password login, returns JWT |
+| POST | `/send-otp` | Send 6-digit OTP to email (10-min expiry) |
+| POST | `/verify-otp` | Verify OTP, returns short-lived reset token |
+| POST | `/reset-password` | Set new password (or create account if new user) |
+| GET | `/me` | Get current user profile |
+| PATCH | `/profile` | Update name and phone |
+| PATCH | `/password` | Change password (requires current password) |
+
+### Trips — `/api/trips`
+
+| Method | Path | Description |
+|---|---|---|
+| POST | `/start` | Start a new trip |
+| POST | `/end/:id` | End trip and submit for approval |
+| GET | `/active` | Get employee's currently active trip |
+| GET | `/` | List trips (own for employees, all for managers) |
+| PATCH | `/:id/approve` | Approve a trip (manager) |
+| PATCH | `/:id/reject` | Reject a trip with notes (manager) |
+| PATCH | `/bulk-action` | Bulk approve or reject trips (manager) |
+
+### GPS — `/api/gps`
+
+| Method | Path | Description |
+|---|---|---|
+| POST | `/track` | Log GPS coordinate for active trip + broadcast via Socket.IO |
+| GET | `/trip/:tripId` | Get all GPS points for a trip |
+
+### Employees & Vehicles — `/api/employees`
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/` | List all employees (manager) |
+| POST | `/` | Create employee (manager) |
+| PATCH | `/:id/rate` | Set custom per-km rate (manager) |
+| GET | `/vehicles` | List vehicles |
+| POST | `/vehicles` | Add vehicle (manager) |
+| DELETE | `/vehicles/:id` | Remove vehicle (manager) |
+
+### Receipts — `/api/receipts`
+
+| Method | Path | Description |
+|---|---|---|
+| POST | `/:tripId` | Upload receipts (max 6, 8 MB each, images + PDF) |
+| GET | `/:tripId` | Get receipts for a trip |
+| DELETE | `/:tripId/:receiptId` | Delete a receipt |
+
+### Reports — `/api/reports`
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/monthly?year=YYYY&month=MM` | Download monthly PDF expense report (manager) |
+
+### Push Notifications — `/api/push`
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/vapid-public-key` | Get public VAPID key |
+| POST | `/subscribe` | Subscribe device for push notifications |
+| DELETE | `/subscribe` | Unsubscribe device |
+
+---
+
+## Real-Time Events (Socket.IO)
+
+| Event | Direction | Description |
+|---|---|---|
+| `gps:update` | Server → Clients | Broadcasts new GPS coordinate for a trip |
+| `gps:locations` | Server → Clients | Broadcasts full active-locations map on connection |

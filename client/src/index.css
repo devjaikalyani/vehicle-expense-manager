@@ -37,12 +37,13 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   background: var(--bg);
   color: var(--text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   min-height: 100vh;
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
 }
 
 /* Ambient background glow */
@@ -85,9 +86,9 @@ body::before {
 }
 
 .navbar-brand {
-  font-size: 0.95rem;
-  font-weight: 800;
-  letter-spacing: -0.02em;
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
   background: linear-gradient(135deg, #a78bfa, #818cf8, #c4b5fd);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -275,19 +276,22 @@ body::before {
   pointer-events: none;
 }
 .gradient-header h1 {
-  font-size: 1.4rem;
+  font-size: 1.45rem;
   font-weight: 800;
   color: white;
-  letter-spacing: -0.025em;
+  letter-spacing: -0.03em;
   position: relative;
   z-index: 1;
+  line-height: 1.2;
 }
 .gradient-header p {
-  color: rgba(255,255,255,0.6);
-  font-size: 0.85rem;
-  margin-top: 0.25rem;
+  color: rgba(255,255,255,0.55);
+  font-size: 0.83rem;
+  margin-top: 0.3rem;
   position: relative;
   z-index: 1;
+  font-weight: 400;
+  line-height: 1.5;
 }
 
 /* ── Gradient stat cards ── */
@@ -324,20 +328,21 @@ body::before {
 .stat-card-emerald { background: var(--grad-emerald); box-shadow: var(--shadow-glow-emerald); }
 
 .stat-value {
-  font-size: 1.7rem;
-  font-weight: 900;
+  font-size: 1.85rem;
+  font-weight: 800;
   color: white;
   line-height: 1;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.04em;
   font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
 }
 .stat-label {
-  font-size: 0.68rem;
-  color: rgba(255,255,255,0.72);
-  margin-top: 0.4rem;
+  font-size: 0.67rem;
+  color: rgba(255,255,255,0.68);
+  margin-top: 0.45rem;
   text-transform: uppercase;
-  letter-spacing: 0.07em;
-  font-weight: 700;
+  letter-spacing: 0.09em;
+  font-weight: 600;
 }
 
 /* ── Buttons ── */
@@ -350,11 +355,12 @@ body::before {
   border: none;
   border-radius: var(--radius);
   cursor: pointer;
-  font-size: 0.875rem;
+  font-size: 0.86rem;
   font-weight: 600;
+  font-family: 'Inter', sans-serif;
   transition: all var(--transition);
   text-decoration: none;
-  letter-spacing: 0.01em;
+  letter-spacing: 0.005em;
   white-space: nowrap;
   position: relative;
 }
@@ -410,12 +416,12 @@ body::before {
 .form-group { margin-bottom: 1rem; }
 .form-group label {
   display: block;
-  font-weight: 700;
+  font-weight: 600;
   margin-bottom: 0.38rem;
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   color: var(--text-2);
   text-transform: uppercase;
-  letter-spacing: 0.07em;
+  letter-spacing: 0.08em;
 }
 .form-group input,
 .form-group select,
@@ -424,11 +430,14 @@ body::before {
   padding: 0.7rem 0.9rem;
   border: 1.5px solid var(--border-solid);
   border-radius: var(--radius);
-  font-size: 0.925rem;
+  font-size: 0.9rem;
+  font-family: 'Inter', sans-serif;
   outline: none;
   transition: border-color var(--transition), box-shadow var(--transition), background var(--transition);
   background: var(--surface-2);
   color: var(--text);
+  font-weight: 400;
+  line-height: 1.5;
 }
 .form-group input:focus,
 .form-group select:focus,
@@ -494,9 +503,11 @@ body::before {
   display: flex;
   gap: 0.55rem;
   flex-wrap: wrap;
-  font-size: 0.79rem;
+  font-size: 0.78rem;
   color: var(--text-2);
   margin-top: 0.3rem;
+  line-height: 1.5;
+  font-weight: 400;
 }
 .trip-divider { border: none; border-top: 1px solid var(--border-solid); margin: 0; }
 
@@ -622,7 +633,7 @@ body::before {
   align-items: center;
   margin-bottom: 1rem;
 }
-.section-title { font-size: 0.95rem; font-weight: 700; color: var(--text); }
+.section-title { font-size: 0.95rem; font-weight: 700; color: var(--text); letter-spacing: -0.01em; }
 
 /* ── Empty state ── */
 .empty-state {

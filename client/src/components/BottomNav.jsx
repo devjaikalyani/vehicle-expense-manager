@@ -52,6 +52,15 @@ function RadioIcon() {
   );
 }
 
+function UserIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </svg>
+  );
+}
+
 export default function BottomNav() {
   const { user } = useAuth();
   const { pathname } = useLocation();
@@ -72,6 +81,7 @@ export default function BottomNav() {
         {item('/trip/active', 'Active', MapPinIcon)}
         {isManager && item('/manager', 'Manager', LayoutIcon)}
         {isManager && item('/live-map', 'Live Map', RadioIcon)}
+        {item('/profile', 'Profile', UserIcon)}
       </div>
     </nav>
   );

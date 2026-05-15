@@ -32,7 +32,21 @@ export default function Navbar() {
           {link('/trips', 'My Trips')}
           {isManager && link('/manager', 'Manager')}
           {isManager && link('/live-map', 'Live Map')}
-          <span className="navbar-user">{user?.name}</span>
+          <Link
+            to="/profile"
+            style={{
+              color: pathname === '/profile' ? '#c4b5fd' : 'rgba(255,255,255,0.5)',
+              textDecoration: 'none',
+              fontSize: '0.8rem',
+              padding: '0 0.5rem',
+              borderLeft: '1px solid rgba(255,255,255,0.1)',
+              marginLeft: '0.25rem',
+              fontWeight: pathname === '/profile' ? '600' : '400',
+              transition: 'color 0.15s',
+            }}
+          >
+            My Profile
+          </Link>
           <button className="btn-logout" onClick={handleLogout}>Logout</button>
         </div>
 
@@ -52,6 +66,7 @@ export default function Navbar() {
         {link('/trips', 'My Trips')}
         {isManager && link('/manager', 'Manager')}
         {isManager && link('/live-map', 'Live Map')}
+        {link('/profile', 'My Profile')}
         <div className="mobile-nav-footer">
           <span className="navbar-user" style={{ borderLeft: 'none', marginLeft: 0 }}>{user?.name}</span>
           <button className="btn-logout" onClick={handleLogout}>Logout</button>

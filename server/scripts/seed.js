@@ -9,8 +9,8 @@ async function seed() {
   await db.query(
     `INSERT INTO users (name, email, password_hash, role, employee_code)
      VALUES ($1, $2, $3, $4, $5)
-     ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash, role = EXCLUDED.role`,
-    ['Admin', 'devjaikalyani@ritewater.in', hash, 'admin', 'RWS-ADMIN']
+     ON CONFLICT (email) DO UPDATE SET name = EXCLUDED.name, password_hash = EXCLUDED.password_hash, role = EXCLUDED.role`,
+    ['Dev Jaikalyani', 'devjaikalyani@ritewater.in', hash, 'admin', 'RWS-ADMIN']
   );
   console.log('Done. Login: devjaikalyani@ritewater.in / Dev@2026#');
   process.exit(0);
