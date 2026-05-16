@@ -73,8 +73,8 @@ export default function LiveMap() {
       <div className="map-container" style={{ height: '480px' }}>
         <MapContainer center={[20.5937, 78.9629]} zoom={5} style={{ height: '100%', width: '100%' }}>
           <TileLayer
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            attribution='&copy; <a href="https://openstreetmap.org">OpenStreetMap</a>'
+            url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+            attribution='&copy; <a href="https://openstreetmap.org">OpenStreetMap</a> &copy; <a href="https://carto.com">CARTO</a>'
           />
           {Object.entries(locations).map(([userId, loc]) => (
             <Marker key={userId} position={[loc.lat, loc.lng]}>

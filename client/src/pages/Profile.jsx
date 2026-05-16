@@ -31,9 +31,10 @@ export default function Profile() {
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileMsg, setProfileMsg] = useState(null);
 
-  const [pwForm, setPwForm] = useState({ current_password: '', new_password: '', confirm_password: '' });
+  const [pwForm, setPwForm] = useState({ new_password: '', confirm_password: '' });
   const [pwSaving, setPwSaving] = useState(false);
   const [pwMsg, setPwMsg] = useState(null);
+  const [pwModalOpen, setPwModalOpen] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -69,12 +70,10 @@ export default function Profile() {
     }
     setPwSaving(true);
     try {
-      await axios.patch('/api/auth/password', {
-        current_password: pwForm.current_password,
-        new_password: pwForm.new_password,
-      });
+      await axios.patch('/api/auth/password', { new_password: pwForm.new_password });
       setPwMsg({ type: 'success', text: 'Password changed successfully.' });
-      setPwForm({ current_password: '', new_password: '', confirm_password: '' });
+      setPwForm({ new_password: '', confirm_password: '' });
+      setTimeout(() => { setPwModalOpen(false); setPwMsg(null); }, 1200);
     } catch (err) {
       setPwMsg({ type: 'error', text: err.response?.data?.error || 'Failed to change password.' });
     } finally {
@@ -193,52 +192,91 @@ export default function Profile() {
         </form>
       </SectionCard>
 
-      {/* Change password */}
-      <SectionCard title="Change Password" subtitle="Use a strong password with letters, numbers, and symbols">
-        {pwMsg && (
-          <div className={`alert alert-${pwMsg.type === 'success' ? 'success' : 'error'}`} style={{ marginBottom: '1rem' }}>
-            {pwMsg.text}
-          </div>
-        )}
-        <form onSubmit={changePassword}>
-          <div className="form-group">
-            <label>Current Password</label>
-            <input
-              type="password"
-              value={pwForm.current_password}
-              onChange={e => setPwForm({ ...pwForm, current_password: e.target.value })}
-              placeholder="Enter current password"
-              required
-            />
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0 1rem' }}>
-            <div className="form-group">
-              <label>New Password</label>
-              <input
-                type="password"
-                value={pwForm.new_password}
-                onChange={e => setPwForm({ ...pwForm, new_password: e.target.value })}
-                placeholder="Min. 6 characters"
-                minLength={6}
-                required
-              />
+      {/* Change password — button triggers modal */}
+      <div className="card" style={{ marginBottom: '1rem' }}>
+        <div style={{ marginBottom: '1rem', paddingBottom: '0.85rem', borderBottom: '1px solid var(--border-solid)' }}>
+          <div style={{ fontWeight: '700', fontSize: '0.95rem', color: 'var(--text)', letterSpacing: '-0.01em' }}>Security</div>
+          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>Manage your account password</div>
+        </div>
+        <button
+          className="btn btn-outline"
+          style={{ minWidth: '160px' }}
+          onClick={() => { setPwModalOpen(true); setPwMsg(null); setPwForm({ new_password: '', confirm_password: '' }); }}
+        >
+          Change Password
+        </button>
+      </div>
+
+      {/* Change password modal */}
+      {pwModalOpen && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 1000,
+          background: 'rgba(0,0,0,0.45)',
+          backdropFilter: 'blur(6px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '1rem',
+        }} onClick={(e) => { if (e.target === e.currentTarget) { setPwModalOpen(false); setPwMsg(null); } }}>
+          <div style={{
+            background: 'var(--surface)',
+            border: '1px solid var(--border-solid)',
+            borderRadius: '1.1rem',
+            padding: '1.75rem',
+            width: '100%',
+            maxWidth: '420px',
+            boxShadow: '0 8px 40px rgba(0,0,0,0.18)',
+          }}>
+            <div style={{ fontWeight: '700', fontSize: '1.05rem', color: 'var(--text)', marginBottom: '0.3rem' }}>
+              Change Password
             </div>
-            <div className="form-group">
-              <label>Confirm New Password</label>
-              <input
-                type="password"
-                value={pwForm.confirm_password}
-                onChange={e => setPwForm({ ...pwForm, confirm_password: e.target.value })}
-                placeholder="Repeat new password"
-                required
-              />
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>
+              Choose a new password for your account.
             </div>
+
+            {pwMsg && (
+              <div className={`alert alert-${pwMsg.type === 'success' ? 'success' : 'error'}`} style={{ marginBottom: '1rem' }}>
+                {pwMsg.text}
+              </div>
+            )}
+
+            <form onSubmit={changePassword}>
+              <div className="form-group">
+                <label>New Password</label>
+                <input
+                  type="password"
+                  value={pwForm.new_password}
+                  onChange={e => setPwForm({ ...pwForm, new_password: e.target.value })}
+                  placeholder="Min. 6 characters"
+                  minLength={6}
+                  autoFocus
+                  required
+                />
+              </div>
+              <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+                <label>Confirm Password</label>
+                <input
+                  type="password"
+                  value={pwForm.confirm_password}
+                  onChange={e => setPwForm({ ...pwForm, confirm_password: e.target.value })}
+                  placeholder="Repeat new password"
+                  required
+                />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <button type="submit" className="btn btn-primary" disabled={pwSaving}>
+                  {pwSaving ? 'Saving...' : 'Save Password'}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => { setPwModalOpen(false); setPwMsg(null); }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
           </div>
-          <button type="submit" className="btn btn-danger" disabled={pwSaving} style={{ minWidth: '160px' }}>
-            {pwSaving ? 'Updating...' : 'Update Password'}
-          </button>
-        </form>
-      </SectionCard>
+        </div>
+      )}
 
       {/* Account info (read-only) */}
       <SectionCard title="Account Details" subtitle="Read-only information managed by your administrator">

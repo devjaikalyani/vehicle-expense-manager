@@ -255,13 +255,10 @@ router.patch('/profile', authenticateToken, async (req, res) => {
 });
 
 router.patch('/password', authenticateToken, async (req, res) => {
-  const { current_password, new_password } = req.body;
-  if (!current_password || !new_password) return res.status(400).json({ error: 'Both fields are required' });
+  const { new_password } = req.body;
+  if (!new_password) return res.status(400).json({ error: 'New password is required' });
   if (new_password.length < 6) return res.status(400).json({ error: 'New password must be at least 6 characters' });
   try {
-    const result = await db.query('SELECT password_hash FROM users WHERE id=$1', [req.user.id]);
-    const valid = await bcrypt.compare(current_password, result.rows[0].password_hash);
-    if (!valid) return res.status(400).json({ error: 'Current password is incorrect' });
     const hash = await bcrypt.hash(new_password, 10);
     await db.query('UPDATE users SET password_hash=$1 WHERE id=$2', [hash, req.user.id]);
     res.json({ message: 'Password updated successfully' });

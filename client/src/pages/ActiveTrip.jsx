@@ -226,7 +226,7 @@ export default function ActiveTrip() {
       {/* Map */}
       <div className="map-container" style={{ height: '360px' }}>
         <MapContainer center={center} zoom={14} style={{ height: '100%', width: '100%' }}>
-          <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; OpenStreetMap' />
+          <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" attribution='&copy; <a href="https://openstreetmap.org">OpenStreetMap</a> &copy; <a href="https://carto.com">CARTO</a>' />
           {route.length > 1 && <Polyline positions={route} color="#1e40af" weight={4} opacity={0.85} />}
           {startPt && <Marker position={startPt}><Popup>Trip Start · {new Date(trip.start_time).toLocaleTimeString()}</Popup></Marker>}
           {currentPos && <Marker position={currentPos} icon={currentIcon}><Popup>Current · {speed.toFixed(1)} km/h</Popup></Marker>}
