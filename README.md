@@ -12,6 +12,7 @@ A full-stack web and PWA application for tracking employee vehicle trips, GPS ro
 - Log fuel expenses (type, litres, amount) when ending a trip
 - Upload up to 6 receipt photos or PDFs per trip
 - View trip history with status filters and CSV export
+- 6-month spending trend chart (claimed vs approved) on dashboard
 - Receive push notifications when claims are approved or rejected
 - Self-service account setup and password reset via OTP email
 
@@ -21,7 +22,8 @@ A full-stack web and PWA application for tracking employee vehicle trips, GPS ro
 - Bulk approve or reject multiple pending trips at once
 - Set custom per-km reimbursement rates per employee
 - Manage employees (add, edit rates) and vehicles (add, assign, delete)
-- Watch a live map of all currently active employee positions
+- Analytics tab: monthly expense trend, top claimants bar chart, approval status breakdown, and KPI cards
+- Live map with employee sidebar — avatar markers, color-coded speed badges, time-ago updates
 - Download monthly PDF expense reports
 
 **Authentication**
@@ -35,7 +37,7 @@ A full-stack web and PWA application for tracking employee vehicle trips, GPS ro
 
 | Layer | Technology |
 |---|---|
-| Frontend | React 18, Vite, React Router, Leaflet.js, Socket.IO client |
+| Frontend | React 18, Vite, React Router, Leaflet.js, Recharts, Socket.IO client |
 | Backend | Node.js, Express, Socket.IO |
 | Database | PostgreSQL |
 | Auth | JWT (jsonwebtoken), bcryptjs |
@@ -43,6 +45,7 @@ A full-stack web and PWA application for tracking employee vehicle trips, GPS ro
 | File uploads | Multer |
 | PDF reports | PDFKit |
 | Push notifications | Web Push (VAPID) |
+| Map tiles | CartoDB Voyager (English labels, no API key) |
 | PWA | Vite Plugin PWA, Workbox |
 
 ---
@@ -201,7 +204,7 @@ Managers can override the rate per employee from the Employees tab in the Manage
 | POST | `/reset-password` | Set new password (or create account if new user) |
 | GET | `/me` | Get current user profile |
 | PATCH | `/profile` | Update name and phone |
-| PATCH | `/password` | Change password (requires current password) |
+| PATCH | `/password` | Change password (authenticated user, no current password required) |
 
 ### Trips — `/api/trips`
 
