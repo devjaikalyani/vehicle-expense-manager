@@ -30,9 +30,9 @@ export default defineConfig({
   ],
   server: {
     proxy: {
-      '/api': 'http://localhost:3001',
-      '/uploads': 'http://localhost:3001',
-      '/socket.io': { target: 'http://localhost:3001', ws: true },
+      '/api': { target: 'http://localhost:3001', changeOrigin: false },
+      '/uploads': { target: 'http://localhost:3001', changeOrigin: false },
+      '/socket.io': { target: 'http://localhost:3001', ws: true, changeOrigin: false },
     },
   },
 });

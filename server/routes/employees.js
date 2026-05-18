@@ -55,6 +55,59 @@ router.patch('/:id/rate', authenticateToken, requireManager, async (req, res) =>
   }
 });
 
+// Teams
+router.get('/teams', authenticateToken, requireManager, async (req, res) => {
+  try {
+    const result = await db.query(`
+      SELECT t.id, t.name, t.created_at,
+        COALESCE(
+          json_agg(json_build_object('id', u.id, 'name', u.name) ORDER BY u.name)
+          FILTER (WHERE u.id IS NOT NULL), '[]'
+        ) AS members
+      FROM teams t LEFT JOIN users u ON u.team_id = t.id
+      GROUP BY t.id ORDER BY t.name
+    `);
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/teams', authenticateToken, requireManager, async (req, res) => {
+  const { name } = req.body;
+  if (!name || !name.trim()) return res.status(400).json({ error: 'Team name is required' });
+  try {
+    const result = await db.query('INSERT INTO teams (name) VALUES ($1) RETURNING *', [name.trim()]);
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    if (err.code === '23505') return res.status(409).json({ error: 'Team name already exists' });
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.delete('/teams/:id', authenticateToken, requireManager, async (req, res) => {
+  try {
+    await db.query('DELETE FROM teams WHERE id = $1', [req.params.id]);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.patch('/:id/team', authenticateToken, requireManager, async (req, res) => {
+  const { team_id } = req.body;
+  try {
+    const result = await db.query(
+      'UPDATE users SET team_id = $1 WHERE id = $2 RETURNING id, name, team_id',
+      [team_id || null, req.params.id]
+    );
+    if (!result.rows[0]) return res.status(404).json({ error: 'Employee not found' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Vehicles
 router.get('/vehicles', authenticateToken, async (req, res) => {
   try {

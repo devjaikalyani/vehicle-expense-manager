@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import axios from 'axios';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { io } from 'socket.io-client';
@@ -41,6 +42,14 @@ function FitBounds({ locations }) {
   return null;
 }
 
+function FlyTo({ target }) {
+  const map = useMap();
+  useEffect(() => {
+    if (target) map.flyTo([target.lat, target.lng], 15, { duration: 0.8 });
+  }, [target]);
+  return null;
+}
+
 function makeIcon(name) {
   const color = avatarColor(name);
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="44" viewBox="0 0 36 44">
@@ -56,9 +65,16 @@ export default function LiveMap() {
   const [locations, setLocations] = useState({});
   const [lastUpdate, setLastUpdate] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
+  const [flyTarget, setFlyTarget] = useState(null);
+  const [empById, setEmpById] = useState({});
   const socketRef = useRef(null);
 
   useEffect(() => {
+    axios.get('/api/employees').then(r => {
+      const map = {};
+      r.data.forEach(e => { map[String(e.id)] = e; });
+      setEmpById(map);
+    });
     socketRef.current = io({ path: '/socket.io' });
     socketRef.current.on('gps:locations', (data) => { setLocations(data); setLastUpdate(new Date()); });
     socketRef.current.on('gps:update', (data) => {
@@ -119,6 +135,7 @@ export default function LiveMap() {
                 </Marker>
               ))}
               <FitBounds locations={locations} />
+              <FlyTo target={flyTarget} />
             </MapContainer>
           </div>
         </div>
@@ -163,7 +180,11 @@ export default function LiveMap() {
                   return (
                     <div
                       key={loc.userId}
-                      onClick={() => setSelectedId(isSelected ? null : String(loc.userId))}
+                      onClick={() => {
+                        const next = isSelected ? null : String(loc.userId);
+                        setSelectedId(next);
+                        if (next) setFlyTarget({ lat: loc.lat, lng: loc.lng });
+                      }}
                       style={{
                         padding: '0.85rem 1rem',
                         borderBottom: '1px solid var(--border-solid)',
@@ -195,6 +216,11 @@ export default function LiveMap() {
                           <div style={{ fontSize: '0.73rem', color: 'var(--text-muted)', marginTop: '1px' }}>
                             {loc.lat?.toFixed(4)}, {loc.lng?.toFixed(4)}
                           </div>
+                          {empById[String(loc.userId)]?.phone && (
+                            <div style={{ fontSize: '0.71rem', color: 'var(--text-muted)', marginTop: '1px' }}>
+                              {empById[String(loc.userId)].phone}
+                            </div>
+                          )}
                         </div>
                         <div style={{ textAlign: 'right', flexShrink: 0 }}>
                           {kmh != null && (

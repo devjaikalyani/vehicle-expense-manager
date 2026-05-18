@@ -5,10 +5,10 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
 
-function getMonthlyData(trips) {
+function getMonthlyData(trips, months = 6) {
   const now = new Date();
-  return Array.from({ length: 6 }, (_, i) => {
-    const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
+  return Array.from({ length: months }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - (months - 1 - i), 1);
     const mt = trips.filter(t => {
       const td = new Date(t.start_time);
       return td.getFullYear() === d.getFullYear() && td.getMonth() === d.getMonth();
@@ -34,6 +34,56 @@ function getEmployeeData(trips) {
     .sort((a, b) => b.claimed - a.claimed)
     .slice(0, 8)
     .map(e => ({ ...e, claimed: Math.round(e.claimed), approved: Math.round(e.approved), name: e.name.split(' ')[0] }));
+}
+
+function IssueList({ title, description, items, color, onAction }) {
+  return (
+    <div className="card" style={{ marginBottom: '1rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem', paddingBottom: '0.75rem', borderBottom: '1px solid var(--border-solid)' }}>
+        <div>
+          <div style={{ fontWeight: '700', fontSize: '0.95rem', color: 'var(--text)' }}>{title}</div>
+          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>{description}</div>
+        </div>
+        <span style={{
+          background: items.length > 0 ? `${color}1a` : '#10b98115',
+          color: items.length > 0 ? color : '#10b981',
+          borderRadius: '20px', padding: '2px 12px', fontSize: '0.8rem', fontWeight: '700', flexShrink: 0,
+        }}>
+          {items.length} issue{items.length !== 1 ? 's' : ''}
+        </span>
+      </div>
+      {items.length === 0 ? (
+        <div style={{ textAlign: 'center', color: '#10b981', fontSize: '0.85rem', padding: '1rem 0' }}>All clear</div>
+      ) : (
+        items.map((trip, i) => (
+          <div key={trip.id} style={{
+            padding: '0.75rem 0',
+            borderBottom: i < items.length - 1 ? '1px solid var(--border-solid)' : 'none',
+            display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', flex: 1, minWidth: 0 }}>
+              <Avatar name={trip.employee_name} size={30} />
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontWeight: '600', fontSize: '0.85rem', color: 'var(--text)' }}>{trip.employee_name}</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  {trip.purpose || 'No purpose'} · {fmtDate(trip.start_time)}
+                </div>
+              </div>
+            </div>
+            <div style={{ flexShrink: 0, marginLeft: '0.5rem', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.3rem' }}>
+              <span className={`badge badge-${trip.status}`}>{trip.status}</span>
+              {trip.status === 'pending' && onAction && (
+                <div style={{ display: 'flex', gap: '0.25rem' }}>
+                  <button className="btn btn-success btn-sm" style={{ padding: '2px 8px', fontSize: '0.72rem' }} onClick={() => onAction(trip, 'approve')}>Approve</button>
+                  <button className="btn btn-danger btn-sm" style={{ padding: '2px 8px', fontSize: '0.72rem' }} onClick={() => onAction(trip, 'reject')}>Reject</button>
+                </div>
+              )}
+            </div>
+          </div>
+        ))
+      )}
+    </div>
+  );
 }
 
 function fmt(n) { return parseFloat(n || 0).toFixed(1); }
@@ -140,6 +190,16 @@ export default function ManagerDashboard() {
   // Custom rate editing: employeeId -> rate string
   const [editingRate, setEditingRate] = useState({});
 
+  const [teams, setTeams] = useState([]);
+  const [teamForm, setTeamForm] = useState({ name: '' });
+  const [showTeamForm, setShowTeamForm] = useState(false);
+  const [analyticsRange, setAnalyticsRange] = useState(6);
+  const [tripSearchInput, setTripSearchInput] = useState('');
+  const [tripSearch, setTripSearch] = useState('');
+
+  const applyTripSearch = () => setTripSearch(tripSearchInput.trim());
+  const clearTripSearch = () => { setTripSearchInput(''); setTripSearch(''); };
+
   const fetchAll = useCallback(async () => {
     const [tripsRes, empRes, vehRes] = await Promise.all([
       axios.get('/api/trips'),
@@ -149,11 +209,19 @@ export default function ManagerDashboard() {
     setTrips(tripsRes.data.filter(t => t.status !== 'active'));
     setEmployees(empRes.data);
     setVehicles(vehRes.data);
+    try {
+      const teamsRes = await axios.get('/api/employees/teams');
+      setTeams(teamsRes.data);
+    } catch { setTeams([]); }
   }, []);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
-  const filtered = filter === 'all' ? trips : trips.filter(t => t.status === filter);
+  const filtered = (filter === 'all' ? trips : trips.filter(t => t.status === filter))
+    .filter(t => !tripSearch ||
+      (t.employee_name || '').toLowerCase().includes(tripSearch.toLowerCase()) ||
+      (t.purpose || '').toLowerCase().includes(tripSearch.toLowerCase())
+    );
   const pendingTrips = trips.filter(t => t.status === 'pending');
   const pendingCount = pendingTrips.length;
 
@@ -225,14 +293,38 @@ export default function ManagerDashboard() {
     } catch (err) { alert(err.response?.data?.error || 'Failed to update rate'); }
   };
 
+  // ── Team management ────────────────────────────────────────────────────────
+  const addTeam = async (e) => {
+    e.preventDefault(); setFormError('');
+    try {
+      await axios.post('/api/employees/teams', teamForm);
+      await fetchAll();
+      setShowTeamForm(false);
+      setTeamForm({ name: '' });
+    } catch (err) { setFormError(err.response?.data?.error || 'Failed to create team'); }
+  };
+
+  const deleteTeam = async (id) => {
+    try {
+      await axios.delete(`/api/employees/teams/${id}`);
+      await fetchAll();
+    } catch (err) { alert(err.response?.data?.error || 'Failed to delete team'); }
+  };
+
+  const assignTeam = async (empId, teamId) => {
+    try {
+      await axios.patch(`/api/employees/${empId}/team`, { team_id: teamId || null });
+      await fetchAll();
+    } catch (err) { alert(err.response?.data?.error || 'Failed to assign team'); }
+  };
+
   // ── Monthly report ──────────────────────────────────────────────────────────
   const downloadReport = async () => {
     setReportLoading(true);
     try {
       const [year, month] = reportMonth.split('-');
-      const token = localStorage.getItem('vem_token');
       const res = await fetch(`/api/reports/monthly?year=${year}&month=${month}`, {
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
       });
       if (!res.ok) throw new Error('Report generation failed');
       const blob = await res.blob();
@@ -260,6 +352,32 @@ export default function ManagerDashboard() {
     const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob); const a = document.createElement('a');
     a.href = url; a.download = `manager-trips-${filter}-${new Date().toISOString().slice(0, 10)}.csv`; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportEmployeeCSV = () => {
+    const empMap = {};
+    trips.forEach(t => {
+      if (!empMap[t.employee_name]) empMap[t.employee_name] = { name: t.employee_name, code: t.employee_code || '', trips: 0, km: 0, total: 0, approved: 0, pending: 0, rejected: 0 };
+      const e = empMap[t.employee_name];
+      e.trips++;
+      e.km += parseFloat(t.manual_distance_km || t.gps_distance_km || 0);
+      e.total += parseFloat(t.expense_amount || 0);
+      if (t.status === 'approved') e.approved += parseFloat(t.expense_amount || 0);
+      else if (t.status === 'pending') e.pending += parseFloat(t.expense_amount || 0);
+      else if (t.status === 'rejected') e.rejected += parseFloat(t.expense_amount || 0);
+    });
+    const rows = [
+      ['Employee', 'Code', 'Trips', 'Total KM', 'Total Claimed', 'Approved', 'Pending', 'Rejected'],
+      ...Object.values(empMap).sort((a, b) => b.total - a.total).map(e => [
+        e.name, e.code, e.trips, e.km.toFixed(1), e.total.toFixed(2), e.approved.toFixed(2), e.pending.toFixed(2), e.rejected.toFixed(2),
+      ]),
+    ];
+    const csv = rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n');
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `employee-summary-${new Date().toISOString().slice(0, 10)}.csv`; a.click();
     URL.revokeObjectURL(url);
   };
 
@@ -300,6 +418,9 @@ export default function ManagerDashboard() {
           { key: 'analytics', label: 'Analytics' },
           { key: 'employees', label: 'Employees' },
           { key: 'vehicles', label: 'Vehicles' },
+          { key: 'field', label: 'Field Status' },
+          { key: 'compliance', label: 'Compliance' },
+          { key: 'teams', label: 'Teams' },
           { key: 'reports', label: 'Reports' },
         ].map(({ key, label }) => (
           <button key={key} onClick={() => setTab(key)} className={`tab-btn ${tab === key ? 'tab-active' : ''}`}>
@@ -334,6 +455,65 @@ export default function ManagerDashboard() {
               )}
               <button className="btn btn-ghost btn-sm" onClick={exportCSV}>Export CSV</button>
             </div>
+          </div>
+
+          {/* Search bar */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            marginBottom: '0.6rem',
+            background: '#f8fafc',
+            border: '1.5px solid #e2e8f0',
+            borderRadius: '10px',
+            padding: '0.4rem 0.6rem',
+            transition: 'border-color 0.15s',
+          }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+              <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            <input
+              value={tripSearchInput}
+              onChange={e => setTripSearchInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && applyTripSearch()}
+              placeholder="Search by employee or purpose..."
+              style={{
+                flex: 1,
+                border: 'none',
+                outline: 'none',
+                background: 'transparent',
+                fontSize: '0.875rem',
+                color: '#0f172a',
+                padding: '0.2rem 0',
+                minWidth: 0,
+              }}
+            />
+            {tripSearchInput && (
+              <button
+                onClick={clearTripSearch}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: '#94a3b8',
+                  padding: '0.1rem 0.25rem',
+                  lineHeight: 1,
+                  fontSize: '1rem',
+                  flexShrink: 0,
+                  borderRadius: '4px',
+                }}
+                title="Clear"
+              >
+                &times;
+              </button>
+            )}
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={applyTripSearch}
+              style={{ flexShrink: 0, padding: '0.3rem 0.9rem' }}
+            >
+              Search
+            </button>
           </div>
 
           {/* Select-all row (only when viewing pending) */}
@@ -405,7 +585,7 @@ export default function ManagerDashboard() {
 
       {/* ────────────────────── ANALYTICS TAB ────────────────────── */}
       {tab === 'analytics' && (() => {
-        const monthlyData = getMonthlyData(trips);
+        const monthlyData = getMonthlyData(trips, analyticsRange);
         const employeeData = getEmployeeData(trips);
         const approved = trips.filter(t => t.status === 'approved');
         const rejected = trips.filter(t => t.status === 'rejected');
@@ -455,7 +635,16 @@ export default function ManagerDashboard() {
 
             {/* Monthly trend */}
             <div className="card" style={{ marginBottom: '1rem' }}>
-              <div style={{ fontWeight: '700', fontSize: '0.95rem', color: 'var(--text)', marginBottom: '1rem' }}>Monthly Expense Trend</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <div style={{ fontWeight: '700', fontSize: '0.95rem', color: 'var(--text)' }}>Monthly Expense Trend</div>
+                <div style={{ display: 'flex', gap: '0.3rem' }}>
+                  {[3, 6, 12].map(n => (
+                    <button key={n} onClick={() => setAnalyticsRange(n)} className={`pill ${analyticsRange === n ? 'pill-active' : 'pill-inactive'}`} style={{ padding: '2px 10px', fontSize: '0.75rem' }}>
+                      {n}M
+                    </button>
+                  ))}
+                </div>
+              </div>
               <ResponsiveContainer width="100%" height={200}>
                 <AreaChart data={monthlyData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                   <defs>
@@ -711,7 +900,15 @@ export default function ManagerDashboard() {
             </ul>
           </div>
 
-          <div style={{ marginTop: '1rem' }}>
+          <div style={{ marginTop: '1.5rem' }}>
+            <h2 style={{ fontSize: '1rem', fontWeight: '700', marginBottom: '0.5rem' }}>Employee Summary CSV</h2>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
+              One row per employee — trips, total KM, claimed, approved, pending, rejected.
+            </p>
+            <button className="btn btn-ghost" onClick={exportEmployeeCSV}>Download Employee Summary</button>
+          </div>
+
+          <div style={{ marginTop: '1.5rem' }}>
             <h2 style={{ fontSize: '1rem', fontWeight: '700', marginBottom: '0.75rem' }}>Quick CSV Export</h2>
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
               {['pending', 'approved', 'rejected', 'all'].map(f => (
@@ -720,6 +917,209 @@ export default function ManagerDashboard() {
                 </button>
               ))}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ────────────────────── FIELD STATUS TAB ────────────────────── */}
+      {tab === 'field' && (() => {
+        const now = new Date();
+        const curMonth = now.getMonth();
+        const curYear = now.getFullYear();
+        return (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '0.75rem' }}>
+            {employees.map(emp => {
+              const empTrips = trips.filter(t => t.employee_id === emp.id);
+              const lastTrip = empTrips[0];
+              const monthTrips = empTrips.filter(t => {
+                const d = new Date(t.start_time);
+                return d.getMonth() === curMonth && d.getFullYear() === curYear;
+              });
+              const hasPending = empTrips.some(t => t.status === 'pending');
+              const monthTotal = monthTrips.reduce((s, t) => s + parseFloat(t.expense_amount || 0), 0);
+              return (
+                <div key={emp.id} className="card" style={{ padding: '1rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.85rem' }}>
+                    <Avatar name={emp.name} size={40} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: '700', fontSize: '0.9rem', color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {emp.name}
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                        {emp.employee_code || emp.email}
+                      </div>
+                    </div>
+                    {hasPending
+                      ? <span className="badge badge-pending" style={{ flexShrink: 0 }}>Pending</span>
+                      : empTrips.length > 0
+                        ? <span className="badge badge-approved" style={{ flexShrink: 0 }}>Active</span>
+                        : null}
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                    <div style={{ background: 'var(--surface-2)', borderRadius: '8px', padding: '0.5rem 0.65rem' }}>
+                      <div style={{ color: 'var(--text-muted)', fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>This Month</div>
+                      <div style={{ fontWeight: '700', color: 'var(--text)', fontSize: '0.9rem' }}>{monthTrips.length} trips</div>
+                    </div>
+                    <div style={{ background: 'var(--surface-2)', borderRadius: '8px', padding: '0.5rem 0.65rem' }}>
+                      <div style={{ color: 'var(--text-muted)', fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>Monthly Exp</div>
+                      <div style={{ fontWeight: '700', color: 'var(--text)', fontSize: '0.9rem' }}>{fmtINR(monthTotal)}</div>
+                    </div>
+                  </div>
+                  <div style={{ marginTop: '0.65rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                    {lastTrip
+                      ? `Last trip: ${fmtDate(lastTrip.start_time)} — ${lastTrip.purpose || 'Trip'}`
+                      : 'No trips recorded'}
+                  </div>
+                  {emp.phone && (
+                    <div style={{ marginTop: '0.3rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>{emp.phone}</div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
+
+      {/* ────────────────────── COMPLIANCE TAB ────────────────────── */}
+      {tab === 'compliance' && (() => {
+        const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+        const missingOdo = trips.filter(t => t.status !== 'active' && t.start_odometer == null && t.end_odometer == null);
+        const longPending = trips.filter(t => t.status === 'pending' && new Date(t.start_time) < sevenDaysAgo);
+        const missingPurpose = trips.filter(t => !t.purpose || t.purpose.trim() === '');
+        const total = missingOdo.length + longPending.length + missingPurpose.length;
+        return (
+          <div>
+            <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
+              {[
+                { label: 'Pending Over 7 Days', count: longPending.length, color: '#ef4444' },
+                { label: 'Missing Odometer', count: missingOdo.length, color: '#f59e0b' },
+                { label: 'Missing Purpose', count: missingPurpose.length, color: '#8b5cf6' },
+              ].map(({ label, count, color }) => (
+                <div key={label} style={{
+                  flex: '1 1 160px',
+                  background: count > 0 ? `${color}12` : '#10b98112',
+                  border: `1px solid ${count > 0 ? color + '40' : '#10b98140'}`,
+                  borderRadius: 'var(--radius)',
+                  padding: '0.85rem 1rem',
+                }}>
+                  <div style={{ fontSize: '1.5rem', fontWeight: '800', color: count > 0 ? color : '#10b981', lineHeight: 1 }}>{count}</div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.2rem', fontWeight: '600' }}>{label}</div>
+                </div>
+              ))}
+            </div>
+            {total === 0 && (
+              <div className="card" style={{ textAlign: 'center', padding: '2.5rem', color: '#10b981', fontWeight: '600', fontSize: '0.95rem' }}>
+                No compliance issues found.
+              </div>
+            )}
+            <IssueList
+              title="Pending Over 7 Days"
+              description="Trips awaiting approval for more than 7 days"
+              items={longPending}
+              color="#ef4444"
+              onAction={(trip, action) => setModal({ trip, action })}
+            />
+            <IssueList
+              title="Missing Odometer Reading"
+              description="Completed trips where neither start nor end odometer was recorded"
+              items={missingOdo}
+              color="#f59e0b"
+              onAction={(trip, action) => setModal({ trip, action })}
+            />
+            <IssueList
+              title="Missing Trip Purpose"
+              description="Trips submitted without a purpose description"
+              items={missingPurpose}
+              color="#8b5cf6"
+              onAction={(trip, action) => setModal({ trip, action })}
+            />
+          </div>
+        );
+      })()}
+
+      {/* ────────────────────── TEAMS TAB ────────────────────── */}
+      {tab === 'teams' && (
+        <div>
+          <div className="card" style={{ marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h2 style={{ fontSize: '1rem', fontWeight: '700' }}>Teams ({teams.length})</h2>
+              <button className="btn btn-primary btn-sm" onClick={() => { setShowTeamForm(!showTeamForm); setFormError(''); }}>
+                {showTeamForm ? 'Cancel' : '+ New Team'}
+              </button>
+            </div>
+            {showTeamForm && (
+              <form onSubmit={addTeam} style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+                {formError && <div className="alert alert-error" style={{ width: '100%' }}>{formError}</div>}
+                <input
+                  value={teamForm.name}
+                  onChange={e => setTeamForm({ name: e.target.value })}
+                  placeholder="Team name (e.g. North Region)"
+                  required
+                  style={{ flex: 1, minWidth: '180px' }}
+                />
+                <button type="submit" className="btn btn-success btn-sm">Create</button>
+              </form>
+            )}
+            {teams.length === 0 ? (
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', textAlign: 'center', padding: '1.5rem 0' }}>
+                No teams yet. Run the teams migration then create a team to group employees.
+              </p>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.65rem' }}>
+                {teams.map(team => (
+                  <div key={team.id} style={{ background: 'var(--surface-2)', border: '1px solid var(--border-solid)', borderRadius: 'var(--radius)', padding: '0.85rem 1rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                      <div style={{ fontWeight: '700', fontSize: '0.9rem', color: 'var(--text)' }}>{team.name}</div>
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => deleteTeam(team.id)}
+                        style={{ padding: '2px 8px', fontSize: '0.72rem', color: '#ef4444' }}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
+                      {(team.members || []).length} member{(team.members || []).length !== 1 ? 's' : ''}
+                    </div>
+                    {(team.members || []).map(m => (
+                      <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.25rem' }}>
+                        <Avatar name={m.name} size={22} />
+                        <span style={{ fontSize: '0.78rem', color: 'var(--text)' }}>{m.name.split(' ')[0]}</span>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="card">
+            <h2 style={{ fontSize: '1rem', fontWeight: '700', marginBottom: '1rem' }}>Assign Employees to Teams</h2>
+            {teams.length === 0 ? (
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Create a team above before assigning employees.</p>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '0.65rem' }}>
+                {employees.filter(e => e.role === 'employee').map(emp => {
+                  const currentTeamId = teams.find(t => (t.members || []).some(m => m.id === emp.id))?.id || '';
+                  return (
+                    <div key={emp.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', background: 'var(--surface-2)', border: '1px solid var(--border-solid)', borderRadius: 'var(--radius)', padding: '0.65rem 0.85rem' }}>
+                      <Avatar name={emp.name} size={32} />
+                      <div style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: '600', fontSize: '0.85rem', color: 'var(--text)' }}>
+                        {emp.name}
+                      </div>
+                      <select
+                        value={String(currentTeamId)}
+                        onChange={e => assignTeam(emp.id, e.target.value)}
+                        style={{ fontSize: '0.78rem', padding: '0.25rem 0.4rem', borderRadius: '6px', border: '1px solid var(--border-solid)', background: 'var(--surface)', color: 'var(--text)', minWidth: '100px', flexShrink: 0 }}
+                      >
+                        <option value="">No team</option>
+                        {teams.map(t => <option key={t.id} value={String(t.id)}>{t.name}</option>)}
+                      </select>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       )}

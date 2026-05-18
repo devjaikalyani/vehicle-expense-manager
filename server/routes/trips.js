@@ -99,20 +99,28 @@ router.get('/active', authenticateToken, async (req, res) => {
 
 router.get('/', authenticateToken, async (req, res) => {
   try {
+    const { employee_id, date } = req.query;
     const base = `SELECT t.*, u.name AS employee_name, u.employee_code,
                   v.name AS vehicle_name, v.type AS vehicle_type, v.registration_number
                   FROM trips t
                   JOIN users u ON t.employee_id = u.id
                   LEFT JOIN vehicles v ON t.vehicle_id = v.id`;
-    let query, params;
+
+    const where = [];
+    const params = [];
+
     if (req.user.role === 'manager' || req.user.role === 'admin') {
-      query = `${base} ORDER BY t.created_at DESC LIMIT 500`;
-      params = [];
+      if (employee_id) { params.push(parseInt(employee_id, 10)); where.push(`t.employee_id = $${params.length}`); }
     } else {
-      query = `${base} WHERE t.employee_id = $1 ORDER BY t.created_at DESC LIMIT 200`;
-      params = [req.user.id];
+      params.push(req.user.id); where.push(`t.employee_id = $${params.length}`);
     }
-    const result = await db.query(query, params);
+    if (date) { params.push(date); where.push(`DATE(t.start_time) = $${params.length}`); }
+
+    const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : '';
+    const orderCol = date ? 'start_time' : 'created_at';
+    const order = date ? 'ASC' : 'DESC';
+    const limit = date ? '' : (req.user.role === 'manager' || req.user.role === 'admin') ? 'LIMIT 500' : 'LIMIT 200';
+    const result = await db.query(`${base} ${whereClause} ORDER BY t.${orderCol} ${order} ${limit}`, params);
     res.json(result.rows);
   } catch (err) {
     res.status(500).json({ error: err.message });

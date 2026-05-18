@@ -3,6 +3,7 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
+const cookieParser = require('cookie-parser');
 const path = require('path');
 
 const authRoutes = require('./routes/auth');
@@ -20,10 +21,12 @@ const io = new Server(server, {
   cors: {
     origin: process.env.CLIENT_URL || 'http://localhost:5173',
     methods: ['GET', 'POST'],
+    credentials: true,
   },
 });
 
-app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173' }));
+app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173', credentials: true }));
+app.use(cookieParser());
 app.use(express.json());
 
 // Serve uploaded receipt files
@@ -38,6 +41,11 @@ app.use('/api/employees', employeeRoutes);
 app.use('/api/receipts', receiptsRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/push', pushRouter);
+
+// Serve React frontend in production
+const clientDist = path.join(__dirname, '../client/dist');
+app.use(express.static(clientDist));
+app.get('*', (_req, res) => res.sendFile(path.join(clientDist, 'index.html')));
 
 // In-memory live locations: userId -> location data
 const liveLocations = new Map();

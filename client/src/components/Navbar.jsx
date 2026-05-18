@@ -32,6 +32,7 @@ export default function Navbar() {
           {link('/trips', 'My Trips')}
           {isManager && link('/manager', 'Manager')}
           {isManager && link('/live-map', 'Live Map')}
+          {isManager && link('/timeline', 'Timeline')}
           <Link
             to="/profile"
             style={{
@@ -66,6 +67,7 @@ export default function Navbar() {
         {link('/trips', 'My Trips')}
         {isManager && link('/manager', 'Manager')}
         {isManager && link('/live-map', 'Live Map')}
+        {isManager && link('/timeline', 'Timeline')}
         {link('/profile', 'My Profile')}
         <div className="mobile-nav-footer">
           <span className="navbar-user" style={{ borderLeft: 'none', marginLeft: 0 }}>{user?.name}</span>

@@ -9,25 +9,31 @@ A full-stack web and PWA application for tracking employee vehicle trips, GPS ro
 **Employee**
 - Start and end trips with odometer readings, vehicle, and purpose
 - Live GPS tracking on an interactive map during active trips
+- Active trip banner shows live elapsed time; last used vehicle is remembered
 - Log fuel expenses (type, litres, amount) when ending a trip
 - Upload up to 6 receipt photos or PDFs per trip
-- View trip history with status filters and CSV export
+- View trip history with status filters, search by purpose or vehicle, and CSV export
 - 6-month spending trend chart (claimed vs approved) on dashboard
 - Receive push notifications when claims are approved or rejected
 - Self-service account setup and password reset via OTP email
 
 **Manager**
-- Review all employee trips with status filters
+- Review all employee trips with status filters and search by employee or purpose
 - Approve or reject individual trips with optional notes
 - Bulk approve or reject multiple pending trips at once
 - Set custom per-km reimbursement rates per employee
 - Manage employees (add, edit rates) and vehicles (add, assign, delete)
-- Analytics tab: monthly expense trend, top claimants bar chart, approval status breakdown, and KPI cards
-- Live map with employee sidebar — avatar markers, color-coded speed badges, time-ago updates
+- Analytics tab: monthly expense trend, top claimants bar chart, approval status breakdown, KPI cards — with 3M/6M/12M range toggle
+- Export per-employee summary as CSV from the Reports tab
+- Live map with employee sidebar — avatar markers, color-coded speed badges, time-ago updates, phone numbers; click to fly to marker
+- Field Status tab: employee card view with monthly trip count, expense totals, last trip, and pending status
+- Compliance tab: flags trips pending over 7 days, missing odometer readings, and missing trip purpose — with inline approve/reject
+- Trip Timeline page: select any employee and date, view ordered trip list and GPS route on map
+- Teams tab: create teams, assign employees to teams for department grouping
 - Download monthly PDF expense reports
 
 **Authentication**
-- Email and password login with JWT session tokens (7-day expiry)
+- Email and password login; session token stored in httpOnly cookie (7-day expiry)
 - Forgot Password: request OTP by email, verify, set new password
 - Set Up Account: new employees register themselves via OTP — no admin pre-creation required
 
@@ -55,10 +61,12 @@ A full-stack web and PWA application for tracking employee vehicle trips, GPS ro
 ```
 Vehicle expense Manager/
 ├── client/                  # React + Vite frontend
+│   ├── public/              # PWA icons (icon-192.png, icon-512.png)
 │   └── src/
 │       ├── pages/           # Login, EmployeeDashboard, ActiveTrip, TripHistory,
-│       │                    # ManagerDashboard, LiveMap, Profile
-│       └── components/      # Navbar, BottomNav
+│       │                    # ManagerDashboard, LiveMap, TripTimeline, Profile
+│       ├── components/      # Navbar, BottomNav
+│       └── sw.js            # Service worker (Workbox precaching + push notifications)
 ├── server/                  # Express backend
 │   ├── routes/              # auth, trips, gps, employees, receipts, reports, push
 │   ├── scripts/             # DB setup, seed, VAPID key gen, Zoho token helper
@@ -79,6 +87,7 @@ Vehicle expense Manager/
 createdb vehicle_expense_manager
 psql -U postgres -d vehicle_expense_manager -f server/scripts/init-db.sql
 psql -U postgres -d vehicle_expense_manager -f server/scripts/migrate-v2.sql
+psql -U postgres -d vehicle_expense_manager -f server/scripts/migrate-teams.sql
 ```
 
 ### 2. Environment
@@ -198,8 +207,9 @@ Managers can override the rate per employee from the Employees tab in the Manage
 
 | Method | Path | Description |
 |---|---|---|
-| POST | `/login` | Email + password login, returns JWT |
-| POST | `/send-otp` | Send 6-digit OTP to email (10-min expiry) |
+| POST | `/login` | Email + password login; sets `vem_token` httpOnly cookie (7 days) |
+| POST | `/logout` | Clears the session cookie |
+| POST | `/send-otp` | Send 6-digit OTP to email (10-min expiry, rate-limited to 5 req/15 min) |
 | POST | `/verify-otp` | Verify OTP, returns short-lived reset token |
 | POST | `/reset-password` | Set new password (or create account if new user) |
 | GET | `/me` | Get current user profile |
@@ -213,7 +223,7 @@ Managers can override the rate per employee from the Employees tab in the Manage
 | POST | `/start` | Start a new trip |
 | POST | `/end/:id` | End trip and submit for approval |
 | GET | `/active` | Get employee's currently active trip |
-| GET | `/` | List trips (own for employees, all for managers) |
+| GET | `/` | List trips (own for employees, all for managers); supports `?employee_id` and `?date` filters |
 | PATCH | `/:id/approve` | Approve a trip (manager) |
 | PATCH | `/:id/reject` | Reject a trip with notes (manager) |
 | PATCH | `/bulk-action` | Bulk approve or reject trips (manager) |
@@ -235,6 +245,10 @@ Managers can override the rate per employee from the Employees tab in the Manage
 | GET | `/vehicles` | List vehicles |
 | POST | `/vehicles` | Add vehicle (manager) |
 | DELETE | `/vehicles/:id` | Remove vehicle (manager) |
+| GET | `/teams` | List teams with members (manager) |
+| POST | `/teams` | Create a team (manager) |
+| DELETE | `/teams/:id` | Delete a team (manager) |
+| PATCH | `/:id/team` | Assign employee to a team, or null to remove (manager) |
 
 ### Receipts — `/api/receipts`
 

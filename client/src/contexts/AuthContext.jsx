@@ -1,5 +1,8 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState } from 'react';
 import axios from 'axios';
+
+// Send cookies with every request automatically
+axios.defaults.withCredentials = true;
 
 const AuthContext = createContext(null);
 
@@ -8,25 +11,18 @@ export function AuthProvider({ children }) {
     try { return JSON.parse(localStorage.getItem('vem_user')); } catch { return null; }
   });
 
-  useEffect(() => {
-    const token = localStorage.getItem('vem_token');
-    if (token) axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-  }, []);
-
   const login = async (email, password) => {
     const res = await axios.post('/api/auth/login', { email, password });
-    const { token, user } = res.data;
-    localStorage.setItem('vem_token', token);
+    const { user } = res.data;
+    // Token is now stored in httpOnly cookie — only persist the non-sensitive user profile
     localStorage.setItem('vem_user', JSON.stringify(user));
-    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
     setUser(user);
     return user;
   };
 
-  const logout = () => {
-    localStorage.removeItem('vem_token');
+  const logout = async () => {
+    try { await axios.post('/api/auth/logout'); } catch { /* ignore */ }
     localStorage.removeItem('vem_user');
-    delete axios.defaults.headers.common['Authorization'];
     setUser(null);
   };
 

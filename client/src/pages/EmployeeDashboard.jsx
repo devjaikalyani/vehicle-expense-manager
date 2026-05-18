@@ -62,10 +62,11 @@ export default function EmployeeDashboard() {
   const [trips, setTrips] = useState([]);
   const [vehicles, setVehicles] = useState([]);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ vehicle_id: '', purpose: '', start_odometer: '' });
+  const [form, setForm] = useState({ vehicle_id: localStorage.getItem('vem_last_vehicle') || '', purpose: '', start_odometer: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [gpsStatus, setGpsStatus] = useState('');
+  const [elapsed, setElapsed] = useState('');
 
   const isManager = user.role === 'manager' || user.role === 'admin';
 
@@ -86,6 +87,18 @@ export default function EmployeeDashboard() {
 
   useEffect(() => { fetchData(); }, []);
 
+  useEffect(() => {
+    if (!activeTrip) { setElapsed(''); return; }
+    const tick = () => {
+      const ms = Date.now() - new Date(activeTrip.start_time).getTime();
+      const h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000);
+      setElapsed(h > 0 ? `${h}h ${m}m` : `${m}m`);
+    };
+    tick();
+    const t = setInterval(tick, 60000);
+    return () => clearInterval(t);
+  }, [activeTrip]);
+
   const getPosition = () =>
     new Promise((resolve, reject) =>
       navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 15000 })
@@ -99,6 +112,7 @@ export default function EmployeeDashboard() {
     try {
       const pos = await getPosition();
       setGpsStatus('Starting trip...');
+      if (form.vehicle_id) localStorage.setItem('vem_last_vehicle', form.vehicle_id);
       await axios.post('/api/trips/start', {
         vehicle_id: form.vehicle_id || null,
         purpose: form.purpose,
@@ -226,8 +240,9 @@ export default function EmployeeDashboard() {
       {activeTrip && (
         <div className="alert alert-info" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
           <span>
-            <strong>Trip in progress</strong> — {activeTrip.purpose || 'Unnamed trip'}, started{' '}
+            <strong>Trip in progress</strong> — {activeTrip.purpose || 'Unnamed trip'} ·{' '}
             {new Date(activeTrip.start_time).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+            {elapsed && <span style={{ marginLeft: '0.4rem', fontWeight: '700' }}>({elapsed})</span>}
           </span>
           <button className="btn btn-danger btn-sm" onClick={() => navigate('/trip/active')}>Open →</button>
         </div>

@@ -3,10 +3,19 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const https = require('https');
 const querystring = require('querystring');
+const rateLimit = require('express-rate-limit');
 const db = require('../db');
 const { authenticateToken } = require('../middleware/auth');
 
 const router = express.Router();
+
+const otpLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: { error: 'Too many OTP requests. Please wait 15 minutes before trying again.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // In-memory OTP store: email -> { otp, expiry }
 const otpStore = new Map();
@@ -118,8 +127,13 @@ router.post('/login', async (req, res) => {
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
+    res.cookie('vem_token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
     res.json({
-      token,
       user: { id: user.id, name: user.name, email: user.email, role: user.role, employee_code: user.employee_code },
     });
   } catch (err) {
@@ -127,8 +141,13 @@ router.post('/login', async (req, res) => {
   }
 });
 
+router.post('/logout', (_req, res) => {
+  res.clearCookie('vem_token');
+  res.json({ ok: true });
+});
+
 // Send OTP to email (for both forgot-password and first-time setup)
-router.post('/send-otp', async (req, res) => {
+router.post('/send-otp', otpLimiter, async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: 'Email is required' });
 

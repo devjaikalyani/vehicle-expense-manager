@@ -8,6 +8,7 @@ import ActiveTrip from './pages/ActiveTrip';
 import TripHistory from './pages/TripHistory';
 import ManagerDashboard from './pages/ManagerDashboard';
 import LiveMap from './pages/LiveMap';
+import TripTimeline from './pages/TripTimeline';
 import Profile from './pages/Profile';
 
 function Layout() {
@@ -44,6 +45,7 @@ export default function App() {
           <Route element={<PrivateRoute managerOnly />}>
             <Route path="/manager" element={<ManagerDashboard />} />
             <Route path="/live-map" element={<LiveMap />} />
+            <Route path="/timeline" element={<TripTimeline />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

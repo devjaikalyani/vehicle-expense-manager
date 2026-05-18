@@ -54,8 +54,13 @@ function ReceiptsSection({ tripId }) {
 export default function TripHistory() {
   const [trips, setTrips] = useState([]);
   const [filter, setFilter] = useState('all');
+  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState(null);
+
+  const applySearch = () => setSearch(searchInput.trim());
+  const clearSearch = () => { setSearchInput(''); setSearch(''); };
 
   useEffect(() => {
     axios.get('/api/trips').then(res => {
@@ -64,7 +69,11 @@ export default function TripHistory() {
     });
   }, []);
 
-  const filtered = filter === 'all' ? trips : trips.filter(t => t.status === filter);
+  const filtered = (filter === 'all' ? trips : trips.filter(t => t.status === filter))
+    .filter(t => !search ||
+      (t.purpose || '').toLowerCase().includes(search.toLowerCase()) ||
+      (t.vehicle_name || '').toLowerCase().includes(search.toLowerCase())
+    );
   const totalKm = filtered.reduce((s, t) => s + parseFloat(t.manual_distance_km || t.gps_distance_km || 0), 0);
   const totalExp = filtered.reduce((s, t) => s + parseFloat(t.expense_amount || 0), 0);
   const approvedExp = filtered.filter(t => t.status === 'approved').reduce((s, t) => s + parseFloat(t.expense_amount || 0), 0);
@@ -111,7 +120,7 @@ export default function TripHistory() {
       </div>
 
       <div className="card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
           <div className="filter-pills" style={{ marginBottom: 0 }}>
             {STATUS_FILTERS.map(f => (
               <button key={f} onClick={() => setFilter(f)} className={`pill ${filter === f ? 'pill-active' : 'pill-inactive'}`}>
@@ -120,6 +129,64 @@ export default function TripHistory() {
             ))}
           </div>
           <button className="btn btn-ghost btn-sm" onClick={exportCSV}>Export CSV</button>
+        </div>
+        {/* Search bar */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+          marginBottom: '0.85rem',
+          background: '#f8fafc',
+          border: '1.5px solid #e2e8f0',
+          borderRadius: '10px',
+          padding: '0.4rem 0.6rem',
+          transition: 'border-color 0.15s',
+        }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+            <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          <input
+            value={searchInput}
+            onChange={e => setSearchInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && applySearch()}
+            placeholder="Search by purpose or vehicle..."
+            style={{
+              flex: 1,
+              border: 'none',
+              outline: 'none',
+              background: 'transparent',
+              fontSize: '0.875rem',
+              color: '#0f172a',
+              padding: '0.2rem 0',
+              minWidth: 0,
+            }}
+          />
+          {searchInput && (
+            <button
+              onClick={clearSearch}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                color: '#94a3b8',
+                padding: '0.1rem 0.25rem',
+                lineHeight: 1,
+                fontSize: '1rem',
+                flexShrink: 0,
+                borderRadius: '4px',
+              }}
+              title="Clear"
+            >
+              &times;
+            </button>
+          )}
+          <button
+            className="btn btn-primary btn-sm"
+            onClick={applySearch}
+            style={{ flexShrink: 0, padding: '0.3rem 0.9rem' }}
+          >
+            Search
+          </button>
         </div>
 
         {loading ? (
