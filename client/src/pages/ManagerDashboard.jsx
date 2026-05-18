@@ -1,5 +1,40 @@
 import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import {
+  AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+} from 'recharts';
+
+function getMonthlyData(trips) {
+  const now = new Date();
+  return Array.from({ length: 6 }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
+    const mt = trips.filter(t => {
+      const td = new Date(t.start_time);
+      return td.getFullYear() === d.getFullYear() && td.getMonth() === d.getMonth();
+    });
+    return {
+      label: d.toLocaleString('en-IN', { month: 'short' }),
+      claimed: Math.round(mt.reduce((s, t) => s + parseFloat(t.expense_amount || 0), 0)),
+      approved: Math.round(mt.filter(t => t.status === 'approved').reduce((s, t) => s + parseFloat(t.expense_amount || 0), 0)),
+      trips: mt.length,
+    };
+  });
+}
+
+function getEmployeeData(trips) {
+  const map = {};
+  trips.forEach(t => {
+    if (!map[t.employee_name]) map[t.employee_name] = { name: t.employee_name, claimed: 0, approved: 0, trips: 0 };
+    map[t.employee_name].claimed += parseFloat(t.expense_amount || 0);
+    if (t.status === 'approved') map[t.employee_name].approved += parseFloat(t.expense_amount || 0);
+    map[t.employee_name].trips++;
+  });
+  return Object.values(map)
+    .sort((a, b) => b.claimed - a.claimed)
+    .slice(0, 8)
+    .map(e => ({ ...e, claimed: Math.round(e.claimed), approved: Math.round(e.approved), name: e.name.split(' ')[0] }));
+}
 
 function fmt(n) { return parseFloat(n || 0).toFixed(1); }
 function fmtINR(n) { return '₹' + parseFloat(n || 0).toFixed(0); }
@@ -262,6 +297,7 @@ export default function ManagerDashboard() {
       <div className="tabs">
         {[
           { key: 'trips', label: 'Trips' },
+          { key: 'analytics', label: 'Analytics' },
           { key: 'employees', label: 'Employees' },
           { key: 'vehicles', label: 'Vehicles' },
           { key: 'reports', label: 'Reports' },
@@ -366,6 +402,138 @@ export default function ManagerDashboard() {
           )}
         </div>
       )}
+
+      {/* ────────────────────── ANALYTICS TAB ────────────────────── */}
+      {tab === 'analytics' && (() => {
+        const monthlyData = getMonthlyData(trips);
+        const employeeData = getEmployeeData(trips);
+        const approved = trips.filter(t => t.status === 'approved');
+        const rejected = trips.filter(t => t.status === 'rejected');
+        const pending = trips.filter(t => t.status === 'pending');
+        const approvalRate = (approved.length + rejected.length) > 0
+          ? Math.round((approved.length / (approved.length + rejected.length)) * 100) : 0;
+        const avgTrip = approved.length > 0
+          ? Math.round(approved.reduce((s, t) => s + parseFloat(t.expense_amount || 0), 0) / approved.length) : 0;
+        const now = new Date();
+        const thisMonthTrips = trips.filter(t => {
+          const d = new Date(t.start_time);
+          return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+        }).length;
+        const totalPending = pending.reduce((s, t) => s + parseFloat(t.expense_amount || 0), 0);
+        const statusData = [
+          { name: 'Approved', value: approved.length, color: '#10b981' },
+          { name: 'Pending', value: pending.length, color: '#f59e0b' },
+          { name: 'Rejected', value: rejected.length, color: '#ef4444' },
+        ].filter(d => d.value > 0);
+
+        const tooltipStyle = {
+          contentStyle: { background: 'var(--surface)', border: '1px solid var(--border-solid)', borderRadius: '10px', fontSize: '0.8rem' },
+          labelStyle: { fontWeight: '600', marginBottom: '2px' },
+        };
+
+        return (
+          <div>
+            {/* KPI row */}
+            <div className="stats-grid" style={{ marginBottom: '1rem' }}>
+              <div className="stat-card stat-card-emerald">
+                <div className="stat-value">{approvalRate}%</div>
+                <div className="stat-label">Approval Rate</div>
+              </div>
+              <div className="stat-card stat-card-ocean">
+                <div className="stat-value">{fmtINR(avgTrip)}</div>
+                <div className="stat-label">Avg Approved Trip</div>
+              </div>
+              <div className="stat-card stat-card-indigo">
+                <div className="stat-value">{thisMonthTrips}</div>
+                <div className="stat-label">Trips This Month</div>
+              </div>
+              <div className="stat-card stat-card-amber">
+                <div className="stat-value">{fmtINR(totalPending)}</div>
+                <div className="stat-label">Pending Amount</div>
+              </div>
+            </div>
+
+            {/* Monthly trend */}
+            <div className="card" style={{ marginBottom: '1rem' }}>
+              <div style={{ fontWeight: '700', fontSize: '0.95rem', color: 'var(--text)', marginBottom: '1rem' }}>Monthly Expense Trend</div>
+              <ResponsiveContainer width="100%" height={200}>
+                <AreaChart data={monthlyData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="mgclaimed" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#667eea" stopOpacity={0.25} />
+                      <stop offset="95%" stopColor="#667eea" stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="mgapproved" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.25} />
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.15)" />
+                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} width={50} tickFormatter={v => v >= 1000 ? `${Math.round(v / 1000)}k` : v} />
+                  <Tooltip {...tooltipStyle} formatter={(v, name) => [`₹${v.toLocaleString('en-IN')}`, name === 'claimed' ? 'Claimed' : 'Approved']} />
+                  <Area type="monotone" dataKey="claimed" stroke="#667eea" strokeWidth={2.5} fill="url(#mgclaimed)" dot={false} />
+                  <Area type="monotone" dataKey="approved" stroke="#10b981" strokeWidth={2.5} fill="url(#mgapproved)" dot={false} />
+                </AreaChart>
+              </ResponsiveContainer>
+              <div style={{ display: 'flex', gap: '1.2rem', marginTop: '0.5rem', justifyContent: 'center' }}>
+                {[['#667eea', 'Claimed'], ['#10b981', 'Approved']].map(([color, label]) => (
+                  <span key={label} style={{ fontSize: '0.75rem', color, display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <span style={{ width: 14, height: 2.5, background: color, display: 'inline-block', borderRadius: 2 }} />{label}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* Employee bar + Status pie */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+              <div className="card">
+                <div style={{ fontWeight: '700', fontSize: '0.95rem', color: 'var(--text)', marginBottom: '1rem' }}>Top Claimants</div>
+                {employeeData.length === 0 ? (
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', textAlign: 'center', padding: '1rem 0' }}>No trip data yet.</p>
+                ) : (
+                  <ResponsiveContainer width="100%" height={Math.max(180, employeeData.length * 32)}>
+                    <BarChart data={employeeData} layout="vertical" margin={{ top: 0, right: 16, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.15)" horizontal={false} />
+                      <XAxis type="number" tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} tickFormatter={v => v >= 1000 ? `${Math.round(v / 1000)}k` : v} />
+                      <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} width={64} />
+                      <Tooltip {...tooltipStyle} formatter={(v, name) => [`₹${v.toLocaleString('en-IN')}`, name === 'claimed' ? 'Claimed' : 'Approved']} />
+                      <Bar dataKey="claimed" fill="#667eea" radius={[0, 4, 4, 0]} maxBarSize={16} />
+                      <Bar dataKey="approved" fill="#10b981" radius={[0, 4, 4, 0]} maxBarSize={16} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+
+              <div className="card">
+                <div style={{ fontWeight: '700', fontSize: '0.95rem', color: 'var(--text)', marginBottom: '1rem' }}>Claim Status Breakdown</div>
+                {statusData.length === 0 ? (
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', textAlign: 'center', padding: '1rem 0' }}>No trips yet.</p>
+                ) : (
+                  <>
+                    <ResponsiveContainer width="100%" height={190}>
+                      <PieChart>
+                        <Pie data={statusData} cx="50%" cy="50%" innerRadius={52} outerRadius={82} dataKey="value" paddingAngle={3}>
+                          {statusData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                        </Pie>
+                        <Tooltip formatter={(v, name) => [v + ' trips', name]} contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border-solid)', borderRadius: '10px', fontSize: '0.8rem' }} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap', marginTop: '0.25rem' }}>
+                      {statusData.map(d => (
+                        <span key={d.name} style={{ fontSize: '0.78rem', color: d.color, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                          <span style={{ width: 10, height: 10, background: d.color, borderRadius: '50%', display: 'inline-block' }} />
+                          {d.name} ({d.value})
+                        </span>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ────────────────────── EMPLOYEES TAB ────────────────────── */}
       {tab === 'employees' && (
