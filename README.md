@@ -95,6 +95,8 @@ Vehicle expense Manager/
 │       ├── api.js           # Typed API client (fetch + cookie auth)
 │       ├── compress.js      # Client-side image compression before upload
 │       ├── geolocation.js   # getCurrentPosition wrapper
+│       ├── gpsQueue.js      # Offline-resilient GPS request queue
+│       ├── useGpsTracking.js # Custom hook for background GPS tracking
 │       └── sw.js            # Service worker (Workbox precaching + push notifications)
 ├── server/                  # Express backend
 │   ├── routes/              # auth, trips, gps, employees, receipts, reports, push
@@ -325,6 +327,7 @@ Managers can override the rate per employee from the Employees tab in the Manage
 | POST | `/start` | Start a new trip |
 | POST | `/end/:id` | End trip and submit for approval |
 | GET | `/active` | Get employee's currently active trip |
+| GET | `/:id` | Get a single trip by ID (own trip for employees, any trip for managers) |
 | GET | `/` | List trips (own for employees, all for managers); supports `?employee_id` and `?date` filters |
 | PATCH | `/:id/approve` | Approve a trip (manager) |
 | PATCH | `/:id/reject` | Reject a trip with notes (manager) |
