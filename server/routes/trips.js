@@ -77,6 +77,10 @@ router.post('/end/:id', authenticateToken, async (req, res) => {
        fuel_exp > 0 ? fuel_exp : 0, fuel_liters || null, fuel_type || null,
        req.params.id]
     );
+    if (req.liveLocations) {
+      req.liveLocations.delete(String(req.user.id));
+      req.io.emit('gps:locations', Object.fromEntries(req.liveLocations));
+    }
     res.json(result.rows[0]);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -92,6 +96,24 @@ router.get('/active', authenticateToken, async (req, res) => {
       [req.user.id]
     );
     res.json(result.rows[0] || null);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/:id', authenticateToken, async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT t.*, u.name AS employee_name, u.employee_code,
+       v.name AS vehicle_name, v.type AS vehicle_type, v.registration_number
+       FROM trips t
+       JOIN users u ON t.employee_id = u.id
+       LEFT JOIN vehicles v ON t.vehicle_id = v.id
+       WHERE t.id = $1 AND (t.employee_id = $2 OR $3 IN ('manager', 'admin'))`,
+      [req.params.id, req.user.id, req.user.role]
+    );
+    if (!result.rows[0]) return res.status(404).json({ error: 'Trip not found' });
+    res.json(result.rows[0]);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -29,7 +29,7 @@ export default function Navbar() {
 
         <div className="navbar-links">
           {link('/', 'Dashboard')}
-          {link('/trips', 'My Trips')}
+          {!isManager && link('/trips', 'My Trips')}
           {isManager && link('/manager', 'Manager')}
           {isManager && link('/live-map', 'Live Map')}
           {isManager && link('/timeline', 'Timeline')}
@@ -64,7 +64,7 @@ export default function Navbar() {
 
       <div className={`mobile-nav ${open ? 'open' : ''}`}>
         {link('/', 'Dashboard')}
-        {link('/trips', 'My Trips')}
+        {!isManager && link('/trips', 'My Trips')}
         {isManager && link('/manager', 'Manager')}
         {isManager && link('/live-map', 'Live Map')}
         {isManager && link('/timeline', 'Timeline')}

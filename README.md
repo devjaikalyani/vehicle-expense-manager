@@ -6,7 +6,7 @@ A full-stack web and PWA application for tracking employee vehicle trips, GPS ro
 
 ## Features
 
-**Employee**
+**Employee (Desktop Web)**
 - Start and end trips with odometer readings, vehicle, and purpose
 - Live GPS tracking on an interactive map during active trips
 - Active trip banner shows live elapsed time; last used vehicle is remembered
@@ -16,6 +16,25 @@ A full-stack web and PWA application for tracking employee vehicle trips, GPS ro
 - 6-month spending trend chart (claimed vs approved) on dashboard
 - Receive push notifications when claims are approved or rejected
 - Self-service account setup and password reset via OTP email
+
+**Employee (Mobile PWA — VEM Field)**
+- Installable PWA served at `/m/` — add to home screen on Android/iOS
+- First-time onboarding wizard (7 steps):
+  - Welcome screen
+  - Location permission grant
+  - Battery optimization settings (bilingual: English + Hindi step-by-step instructions)
+  - Upload proof screenshots of battery settings
+  - Notification permission grant
+  - Background tracking verification (shows what the active-trip notification should look like)
+  - Setup finished confirmation screen
+- Odometer scanning: full-screen live camera with corner bracket frame overlay ("Align the digits inside the frame")
+- 6-digit split OTP-style odometer entry with auto-advance and paste support
+- "Not travelling today?" skip modal with required reason field
+- Side-by-side Punch In / Punch Out odometer photo cards in conveyance summary
+- Distance travelled shown prominently with "Please update odometer reading if not correct"
+- Fuel expense logging (amount, litres, fuel type) on trip end
+- Trip history with status badges and detail view
+- Live GPS map with blue location dot and elapsed trip timer during active trips
 
 **Manager**
 - Review all employee trips with status filters and search by employee or purpose
@@ -43,7 +62,8 @@ A full-stack web and PWA application for tracking employee vehicle trips, GPS ro
 
 | Layer | Technology |
 |---|---|
-| Frontend | React 18, Vite, React Router, Leaflet.js, Recharts, Socket.IO client |
+| Desktop Frontend | React 18, Vite, React Router, Leaflet.js, Recharts, Socket.IO client |
+| Mobile PWA | React 18, Vite, React Router, Leaflet.js, Vite Plugin PWA (Workbox injectManifest) |
 | Backend | Node.js, Express, Socket.IO |
 | Database | PostgreSQL |
 | Auth | JWT (jsonwebtoken), bcryptjs |
@@ -52,7 +72,6 @@ A full-stack web and PWA application for tracking employee vehicle trips, GPS ro
 | PDF reports | PDFKit |
 | Push notifications | Web Push (VAPID) |
 | Map tiles | CartoDB Voyager (English labels, no API key) |
-| PWA | Vite Plugin PWA, Workbox |
 
 ---
 
@@ -60,21 +79,32 @@ A full-stack web and PWA application for tracking employee vehicle trips, GPS ro
 
 ```
 Vehicle expense Manager/
-├── client/                  # React + Vite frontend
+├── client/                  # React + Vite desktop frontend
 │   ├── public/              # PWA icons (icon-192.png, icon-512.png)
 │   └── src/
 │       ├── pages/           # Login, EmployeeDashboard, ActiveTrip, TripHistory,
 │       │                    # ManagerDashboard, LiveMap, TripTimeline, Profile
 │       ├── components/      # Navbar, BottomNav
 │       └── sw.js            # Service worker (Workbox precaching + push notifications)
+├── client-mobile/           # React + Vite mobile PWA (VEM Field) — served at /m/
+│   ├── public/              # PWA icons (icon-192.png, icon-512.png)
+│   └── src/
+│       ├── pages/           # Login, Onboarding, Home, StartTrip, EndTrip,
+│       │                    # History, TripDetail, Profile
+│       ├── components/      # BottomNav, OdometerScanner
+│       ├── api.js           # Typed API client (fetch + cookie auth)
+│       ├── compress.js      # Client-side image compression before upload
+│       ├── geolocation.js   # getCurrentPosition wrapper
+│       └── sw.js            # Service worker (Workbox precaching + push notifications)
 ├── server/                  # Express backend
 │   ├── routes/              # auth, trips, gps, employees, receipts, reports, push
 │   ├── scripts/             # DB setup, seed, VAPID key gen, Zoho token helper
 │   ├── middleware/          # JWT authentication
+│   ├── mobile-dist/         # Built mobile PWA output (gitignored, served at /m/)
 │   ├── uploads/             # Receipt files (gitignored)
 │   ├── db.js                # PostgreSQL connection pool
 │   └── index.js             # Server entry point
-└── package.json             # Root: concurrently runs both servers
+└── package.json             # Root: concurrently runs all dev servers
 ```
 
 ---
@@ -157,17 +187,89 @@ node server/scripts/gen-vapid.js
 
 Copy the two printed keys into `server/.env` as `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY`.
 
+### 7. (Optional) HTTPS for mobile PWA development
+
+The mobile PWA requires HTTPS for camera access and GPS. Generate a local certificate with [mkcert](https://github.com/FiloSottile/mkcert):
+
+```bash
+mkcert 192.168.YOUR.IP localhost 127.0.0.1
+```
+
+Place the generated `.pem` files in the project root. The Vite dev server and Express server both detect and use them automatically.
+
 ---
 
 ## Running
+
+### Development
 
 ```bash
 npm run dev
 ```
 
-Starts the backend on port `3001` and the frontend on port `5173` in a single terminal.
+Starts the backend on port `3001` and the desktop frontend on port `5173`.
 
-Open [http://localhost:5173](http://localhost:5173) in your browser.
+To also run the mobile PWA dev server:
+
+```bash
+cd client-mobile
+npm run dev
+```
+
+Mobile PWA dev server runs on port `5174` (HTTPS if certificates are present).
+
+Open [http://localhost:5173](http://localhost:5173) for the desktop app.
+Open [https://192.168.YOUR.IP:5174/m/](https://192.168.YOUR.IP:5174/m/) on your phone for the mobile PWA.
+
+### Production
+
+Build the mobile PWA into the server's static folder:
+
+```bash
+cd client-mobile
+npm run build
+```
+
+The output goes to `server/mobile-dist/` and is served automatically at `/m/` by the Express server.
+
+Build the desktop frontend:
+
+```bash
+cd client
+npm run build
+```
+
+Then start the server:
+
+```bash
+cd server
+npm start
+```
+
+---
+
+## Mobile PWA — VEM Field
+
+VEM Field is the mobile-first PWA for field employees. It is served at `/m/` from the same Express server.
+
+### Installing on Android
+
+1. Open `https://your-server/m/` in Chrome
+2. Tap the browser menu > **Add to Home Screen**
+3. Launch VEM Field from the home screen icon
+
+### Battery optimization (required for GPS tracking)
+
+For continuous GPS tracking during trips, the app must be excluded from battery optimization:
+
+1. **Settings** > search "Battery" > **Power Saving Mode** > disable "Automatically enter power saving mode"
+2. Long press the VEM Field app icon > **App Info** > **Battery Usage** > set to **Unrestricted**
+
+The onboarding wizard guides users through these steps with bilingual (English + Hindi) instructions on first launch.
+
+### Odometer scanning
+
+The Start Trip and End Trip screens open a full-screen live camera with a corner bracket frame for aligning odometer digits. After capturing, readings are entered using a 6-digit split input. If the employee is not travelling, they can skip the scan and provide a reason.
 
 ---
 
@@ -278,5 +380,6 @@ Managers can override the rate per employee from the Employees tab in the Manage
 
 | Event | Direction | Description |
 |---|---|---|
-| `gps:update` | Server → Clients | Broadcasts new GPS coordinate for a trip |
+| `gps:update` | Client → Server | Send new GPS coordinate for active trip |
+| `gps:stop` | Client → Server | Signal trip ended, remove from live map |
 | `gps:locations` | Server → Clients | Broadcasts full active-locations map on connection |

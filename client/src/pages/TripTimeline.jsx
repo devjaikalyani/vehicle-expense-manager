@@ -40,7 +40,9 @@ export default function TripTimeline() {
   const [trips, setTrips] = useState([]);
   const [loading, setLoading] = useState(false);
   const [activeTrip, setActiveTrip] = useState(null);
+  const [activeTripData, setActiveTripData] = useState(null);
   const [gpsPoints, setGpsPoints] = useState([]);
+  const [osrmRoutes, setOsrmRoutes] = useState([]);
   const [gpsLoading, setGpsLoading] = useState(false);
 
   useEffect(() => {
@@ -61,14 +63,38 @@ export default function TripTimeline() {
   const toggleRoute = async (trip) => {
     if (activeTrip === trip.id) {
       setActiveTrip(null);
+      setActiveTripData(null);
       setGpsPoints([]);
+      setOsrmRoutes([]);
       return;
     }
     setActiveTrip(trip.id);
+    setActiveTripData(trip);
+    setOsrmRoutes([]);
     setGpsLoading(true);
     try {
       const res = await axios.get(`/api/gps/trip/${trip.id}`);
-      setGpsPoints(res.data.map(p => [parseFloat(p.latitude), parseFloat(p.longitude)]));
+      const pts = res.data.map(p => [parseFloat(p.latitude), parseFloat(p.longitude)]);
+      setGpsPoints(pts);
+
+      // If no GPS tracks but start+end coords exist, reconstruct via OSRM
+      if (pts.length === 0 && trip.start_lat && trip.start_lng && trip.end_lat && trip.end_lng) {
+        try {
+          const url = `https://router.project-osrm.org/route/v1/driving/` +
+            `${trip.start_lng},${trip.start_lat};${trip.end_lng},${trip.end_lat}` +
+            `?overview=full&geometries=geojson&alternatives=true`;
+          const osrm = await fetch(url).then(r => r.json());
+          if (osrm.routes?.length) {
+            setOsrmRoutes(
+              osrm.routes.map(r => ({
+                coords: r.geometry.coordinates.map(([lng, lat]) => [lat, lng]),
+                distanceKm: (r.distance / 1000).toFixed(1),
+                durationMin: Math.round(r.duration / 60),
+              }))
+            );
+          }
+        } catch { /* OSRM unavailable, silently skip */ }
+      }
     } catch {
       setGpsPoints([]);
     } finally {
@@ -259,10 +285,71 @@ export default function TripTimeline() {
                   <Popup><div style={{ fontWeight: '600' }}>Trip location</div></Popup>
                 </Marker>
               )}
-              <FitRoute points={gpsPoints} />
+              {/* OSRM reconstructed routes — shown when no GPS tracks */}
+              {gpsPoints.length === 0 && osrmRoutes.map((route, i) => (
+                <Polyline
+                  key={i}
+                  positions={route.coords}
+                  color={i === 0 ? '#667eea' : '#94a3b8'}
+                  weight={i === 0 ? 4 : 2}
+                  opacity={i === 0 ? 0.85 : 0.5}
+                  dashArray={i === 0 ? '8 6' : '4 6'}
+                />
+              ))}
+
+              {gpsPoints.length === 0 && !gpsLoading && activeTripData && (
+                <>
+                  {activeTripData.start_lat && activeTripData.start_lng && (
+                    <Marker position={[parseFloat(activeTripData.start_lat), parseFloat(activeTripData.start_lng)]}>
+                      <Popup>
+                        <div style={{ fontWeight: '700', marginBottom: 2 }}>Start</div>
+                        <div style={{ fontSize: '0.8rem', color: '#64748b' }}>{activeTripData.purpose || 'Trip'}</div>
+                        <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>{fmtTime(activeTripData.start_time)}</div>
+                      </Popup>
+                    </Marker>
+                  )}
+                  {activeTripData.end_lat && activeTripData.end_lng && (
+                    <Marker position={[parseFloat(activeTripData.end_lat), parseFloat(activeTripData.end_lng)]}>
+                      <Popup>
+                        <div style={{ fontWeight: '700', marginBottom: 2 }}>End</div>
+                        <div style={{ fontSize: '0.8rem', color: '#64748b' }}>{activeTripData.purpose || 'Trip'}</div>
+                        <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>{activeTripData.end_time ? fmtTime(activeTripData.end_time) : ''}</div>
+                      </Popup>
+                    </Marker>
+                  )}
+                </>
+              )}
+              <FitRoute points={
+                gpsPoints.length > 0 ? gpsPoints :
+                activeTripData?.start_lat && activeTripData?.end_lat
+                  ? [[parseFloat(activeTripData.start_lat), parseFloat(activeTripData.start_lng)], [parseFloat(activeTripData.end_lat), parseFloat(activeTripData.end_lng)]]
+                  : activeTripData?.start_lat
+                  ? [[parseFloat(activeTripData.start_lat), parseFloat(activeTripData.start_lng)]]
+                  : []
+              } />
             </MapContainer>
           </div>
-          {activeTrip && !gpsLoading && gpsPoints.length === 0 && (
+          {activeTrip && !gpsLoading && gpsPoints.length === 0 && osrmRoutes.length > 0 && (
+            <div style={{ padding: '0.65rem 1rem', background: 'var(--surface)', borderTop: '1px solid var(--border-solid)' }}>
+              <div style={{ fontSize: '0.78rem', fontWeight: '600', color: 'var(--text-muted)', marginBottom: '0.35rem' }}>
+                Estimated routes (no GPS recorded — reconstructed via OpenStreetMap)
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                {osrmRoutes.map((r, i) => (
+                  <span key={i} style={{
+                    fontSize: '0.75rem', padding: '2px 10px', borderRadius: '20px',
+                    background: i === 0 ? '#667eea1a' : '#94a3b81a',
+                    color: i === 0 ? '#667eea' : '#94a3b8',
+                    fontWeight: '600',
+                    border: `1px solid ${i === 0 ? '#667eea40' : '#94a3b840'}`,
+                  }}>
+                    {i === 0 ? 'Most likely' : `Alt ${i}`} — {r.distanceKm} km · {r.durationMin} min
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          {activeTrip && !gpsLoading && gpsPoints.length === 0 && osrmRoutes.length === 0 && (
             <div style={{ textAlign: 'center', padding: '0.65rem', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
               No GPS data recorded for this trip.
             </div>

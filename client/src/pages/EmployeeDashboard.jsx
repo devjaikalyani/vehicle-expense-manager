@@ -335,6 +335,11 @@ export default function EmployeeDashboard() {
                   <div style={{ fontWeight: '600', color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {trip.purpose || 'Trip'}
                   </div>
+                  {isManager && trip.employee_name && (
+                    <div style={{ fontSize: '0.78rem', fontWeight: '600', color: 'var(--brand-1)', marginBottom: '0.1rem' }}>
+                      {trip.employee_name}{trip.employee_code ? ` (${trip.employee_code})` : ''}
+                    </div>
+                  )}
                   <div className="trip-meta">
                     <span>{fmtDate(trip.start_time)}</span>
                     {trip.vehicle_name && <span>{trip.vehicle_name}</span>}

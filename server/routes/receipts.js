@@ -20,7 +20,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 8 * 1024 * 1024 },
+  limits: { fileSize: 20 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     const allowed = /\.(jpe?g|png|gif|webp|pdf)$/i;
     const mime = /^(image\/(jpeg|png|gif|webp)|application\/pdf)$/;
@@ -33,7 +33,12 @@ const upload = multer({
 });
 
 // Upload receipts for a trip (employee must own the trip)
-router.post('/:tripId', authenticateToken, upload.array('receipts', 6), async (req, res) => {
+router.post('/:tripId', authenticateToken, (req, res, next) => {
+  upload.array('receipts', 6)(req, res, (err) => {
+    if (err) return res.status(400).json({ error: err.message });
+    next();
+  });
+}, async (req, res) => {
   try {
     const tripCheck = await db.query(
       'SELECT id FROM trips WHERE id = $1 AND employee_id = $2',

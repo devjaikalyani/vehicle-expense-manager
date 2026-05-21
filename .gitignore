@@ -1,6 +1,9 @@
 node_modules/
 server/.env
 server/uploads/
+server/mobile-dist/
 *.log
 dist/
 .DS_Store
+*.pem
+*.exe

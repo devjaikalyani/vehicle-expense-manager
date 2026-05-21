@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useAuth } from '../contexts/AuthContext';
 
 const STATUS_FILTERS = ['all', 'pending', 'approved', 'rejected'];
 
@@ -52,6 +53,8 @@ function ReceiptsSection({ tripId }) {
 }
 
 export default function TripHistory() {
+  const { user } = useAuth();
+  const isManager = user?.role === 'manager' || user?.role === 'admin';
   const [trips, setTrips] = useState([]);
   const [filter, setFilter] = useState('all');
   const [searchInput, setSearchInput] = useState('');
@@ -205,6 +208,11 @@ export default function TripHistory() {
                 <div className="trip-row">
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: '700', color: '#0f172a' }}>{trip.purpose || 'Trip'}</div>
+                    {isManager && trip.employee_name && (
+                      <div style={{ fontSize: '0.78rem', fontWeight: '600', color: '#1e40af', marginBottom: '0.15rem' }}>
+                        {trip.employee_name}{trip.employee_code ? ` (${trip.employee_code})` : ''}
+                      </div>
+                    )}
                     <div className="trip-meta">
                       <span>{fmtDate(trip.start_time)}, {fmtTime(trip.start_time)}</span>
                       <span>Duration: {duration(trip.start_time, trip.end_time)}</span>
