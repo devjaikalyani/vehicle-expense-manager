@@ -9,11 +9,11 @@ self.addEventListener('push', (event) => {
   try { data = event.data.json(); } catch { data = { title: 'Notification', body: event.data.text() }; }
 
   event.waitUntil(
-    self.registration.showNotification(data.title || 'Vehicle Expense Manager', {
+    self.registration.showNotification(data.title || 'Employee Vehicle Manager', {
       body: data.body || '',
       icon: '/icon-192.png',
       badge: '/icon-192.png',
-      tag: 'vem-notification',
+      tag: 'evm-notification',
       renotify: true,
       data: { url: data.url || '/' },
     })

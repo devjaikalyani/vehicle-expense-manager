@@ -8,7 +8,6 @@ function avatarColor(name) {
 }
 
 function fmt(n) { return parseFloat(n || 0).toFixed(1); }
-function fmtINR(n) { return '₹' + parseFloat(n || 0).toFixed(0); }
 
 function SectionCard({ title, subtitle, children }) {
   return (
@@ -84,8 +83,6 @@ export default function Profile() {
   const completedTrips = trips.filter(t => t.status !== 'active');
   const approvedTrips = completedTrips.filter(t => t.status === 'approved');
   const totalKm = completedTrips.reduce((s, t) => s + parseFloat(t.manual_distance_km || t.gps_distance_km || 0), 0);
-  const totalClaimed = completedTrips.reduce((s, t) => s + parseFloat(t.expense_amount || 0), 0);
-  const totalApproved = approvedTrips.reduce((s, t) => s + parseFloat(t.expense_amount || 0), 0);
 
   if (!profile) {
     return (
@@ -139,14 +136,6 @@ export default function Profile() {
         <div className="stat-card stat-card-ocean">
           <div className="stat-value">{fmt(totalKm)}</div>
           <div className="stat-label">Total KM</div>
-        </div>
-        <div className="stat-card stat-card-amber">
-          <div className="stat-value">{fmtINR(totalClaimed)}</div>
-          <div className="stat-label">Total Claimed</div>
-        </div>
-        <div className="stat-card stat-card-emerald">
-          <div className="stat-value">{fmtINR(totalApproved)}</div>
-          <div className="stat-label">Approved</div>
         </div>
       </div>
 

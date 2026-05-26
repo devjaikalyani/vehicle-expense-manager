@@ -60,8 +60,6 @@ function DigitBoxes({ value, onChange }) {
 
 export default function StartTrip() {
   const navigate = useNavigate();
-  const [vehicles, setVehicles] = useState([]);
-  const [vehicleId, setVehicleId] = useState('');
   const [purpose, setPurpose] = useState('');
   const [startOdometer, setStartOdometer] = useState('');
   const [photo, setPhoto] = useState(null);
@@ -69,16 +67,41 @@ export default function StartTrip() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
+  const [timeLimitExceeded, setTimeLimitExceeded] = useState(false);
+  const [recentPurposes, setRecentPurposes] = useState([]);
+  const [startAddress, setStartAddress] = useState('');
   const fileRef = useRef(null);
 
   useEffect(() => {
-    api.vehicles().then(setVehicles).catch(() => {});
+    const timer = setTimeout(() => setTimeLimitExceeded(true), 60000);
+    return () => clearTimeout(timer);
   }, []);
 
-  async function handleScanCapture(blob) {
-    const compressed = await compressImage(blob);
-    setPhoto(compressed);
-    setPreview(URL.createObjectURL(compressed));
+  useEffect(() => {
+    api.myTrips().then(trips => {
+      const purposes = [...new Set(trips.map(t => t.purpose).filter(Boolean))].slice(0, 5);
+      setRecentPurposes(purposes);
+    }).catch(() => {});
+
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(async (pos) => {
+        try {
+          const r = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&format=json`,
+            { headers: { 'Accept-Language': 'en' } }
+          );
+          const data = await r.json();
+          const addr = data.address || {};
+          const parts = [addr.suburb || addr.neighbourhood, addr.city || addr.town || addr.village, addr.state].filter(Boolean);
+          if (parts.length) setStartAddress(parts.join(', '));
+        } catch {}
+      }, () => {}, { timeout: 8000 });
+    }
+  }, []);
+
+  function handleScanCapture(file) {
+    setPhoto(file);
+    setPreview(URL.createObjectURL(file));
     setShowScanner(false);
   }
 
@@ -100,12 +123,25 @@ export default function StartTrip() {
     setLoading(true);
     try {
       const pos = await getCurrentPosition();
+      let resolvedAddress = startAddress || null;
+      if (!resolvedAddress && pos) {
+        try {
+          const r = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${pos.lat}&lon=${pos.lng}&format=json`,
+            { headers: { 'Accept-Language': 'en' } }
+          );
+          const data = await r.json();
+          const addr = data.address || {};
+          const parts = [addr.suburb || addr.neighbourhood, addr.city || addr.town || addr.village, addr.state].filter(Boolean);
+          if (parts.length) resolvedAddress = parts.join(', ');
+        } catch {}
+      }
       const trip = await api.startTrip({
-        vehicle_id: vehicleId || null,
         purpose: purpose.trim() || null,
         start_odometer: startOdometer ? parseFloat(startOdometer) : null,
         start_lat: pos?.lat ?? null,
         start_lng: pos?.lng ?? null,
+        start_address: resolvedAddress,
       });
       if (photo) await api.uploadPhotos(trip.id, [photo]);
       navigate('/', { replace: true });
@@ -124,6 +160,30 @@ export default function StartTrip() {
 
   return (
     <>
+      {timeLimitExceeded && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 24 }}>
+          <div style={{ background: '#fff', borderRadius: 18, padding: '28px 24px', maxWidth: 320, width: '100%', textAlign: 'center', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+            <div style={{ width: 52, height: 52, borderRadius: '50%', background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+            </div>
+            <h3 style={{ fontSize: 17, fontWeight: 700, color: '#0f172a', margin: '0 0 10px' }}>Time Limit Exceeded</h3>
+            <p style={{ fontSize: 14, color: '#64748b', margin: '0 0 24px', lineHeight: 1.5 }}>
+              1 minute time limit has exceeded for submission.
+            </p>
+            <button
+              onClick={() => navigate('/', { replace: true })}
+              style={{ width: '100%', padding: '13px', borderRadius: 12, background: '#1e40af', color: '#fff', border: 'none', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
+
       {showScanner && (
         <OdometerScanner
           onCapture={handleScanCapture}
@@ -152,22 +212,24 @@ export default function StartTrip() {
         </div>
 
         <form onSubmit={handleSubmit} style={{ padding: 16 }}>
-          {/* Vehicle + Purpose card */}
+          {/* Purpose card */}
           <div style={{ background: '#fff', borderRadius: 18, boxShadow: '0 1px 4px rgba(0,0,0,0.07)', overflow: 'hidden', marginBottom: 14 }}>
-            <div style={{ padding: '4px 16px 0' }}>
-              <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', paddingTop: 14 }}>
-                Vehicle
-              </label>
-              <select
-                value={vehicleId}
-                onChange={e => setVehicleId(e.target.value)}
-                style={{ ...fieldStyle, color: vehicleId ? '#0f172a' : '#94a3b8' }}
-              >
-                <option value="">Select vehicle (optional)</option>
-                {vehicles.map(v => (
-                  <option key={v.id} value={v.id}>{v.name} ({v.registration_number})</option>
-                ))}
-              </select>
+            <div style={{ padding: '4px 16px 14px' }}>
+              {startAddress ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: '#f0fdf4', borderRadius: 10, marginTop: 8 }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
+                  </svg>
+                  <span style={{ fontSize: 13, color: '#15803d', fontWeight: 500 }}>{startAddress}</span>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: '#f8fafc', borderRadius: 10, marginTop: 8 }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
+                  </svg>
+                  <span style={{ fontSize: 13, color: '#94a3b8' }}>Getting location...</span>
+                </div>
+              )}
             </div>
 
             <div style={{ height: 1, background: '#f1f5f9', margin: '0 16px' }} />
@@ -181,8 +243,27 @@ export default function StartTrip() {
                 value={purpose}
                 onChange={e => setPurpose(e.target.value)}
                 placeholder="e.g. Client visit, Delivery"
-                style={{ ...fieldStyle, paddingBottom: 14 }}
+                style={{ ...fieldStyle, paddingBottom: recentPurposes.length > 0 ? 0 : 14 }}
               />
+              {recentPurposes.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10, paddingBottom: 14 }}>
+                  {recentPurposes.map(p => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => setPurpose(p)}
+                      style={{
+                        padding: '5px 14px', borderRadius: 20, border: `1.5px solid ${purpose === p ? '#1e40af' : '#e2e8f0'}`,
+                        background: purpose === p ? '#eff6ff' : '#f8fafc',
+                        color: purpose === p ? '#1e40af' : '#64748b',
+                        fontSize: 12, fontWeight: 500, cursor: 'pointer',
+                      }}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 

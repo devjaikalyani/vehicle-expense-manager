@@ -26,9 +26,9 @@ export default defineConfig({
       srcDir: 'src',
       filename: 'sw.js',
       manifest: {
-        name: 'VEM Field',
-        short_name: 'VEM Field',
-        description: 'Log your trips and expenses',
+        name: 'EVM Field',
+        short_name: 'EVM Field',
+        description: 'Track your trips and distance',
         theme_color: '#1e40af',
         background_color: '#f1f5f9',
         display: 'standalone',
@@ -52,6 +52,7 @@ export default defineConfig({
     proxy: {
       '/api': { target: 'https://localhost:3001', changeOrigin: true, secure: false },
       '/uploads': { target: 'https://localhost:3001', changeOrigin: true, secure: false },
+      '/socket.io': { target: 'https://localhost:3001', ws: true, changeOrigin: true, secure: false },
     },
   },
   build: {

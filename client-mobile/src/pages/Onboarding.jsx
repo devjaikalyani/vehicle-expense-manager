@@ -4,8 +4,8 @@ import { useNavigate } from 'react-router-dom';
 const STEPS = [
   {
     id: 'welcome',
-    title: 'VEM Field makes your work easier',
-    body: 'Track your trips, log fuel expenses, and get reimbursed faster. Let us set a few things up for you.',
+    title: 'EVM Field makes your work easier',
+    body: 'Track your trips and total distance travelled. Let us set a few things up for you.',
     action: null,
   },
   {
@@ -19,45 +19,45 @@ const STEPS = [
   {
     id: 'battery',
     title: 'Allow background access',
-    titleHi: 'Background access allow karein',
-    body: 'To track your trip without interruption, allow VEM Field to run without battery restrictions.',
-    bodyHi: 'Trip track karte samay app band na ho, isliye battery restriction hatayein.',
+    titleHi: 'पृष्ठभूमि में चलाने की अनुमति दें',
+    body: 'To track your trip without interruption, allow EVM Field to run without battery restrictions.',
+    bodyHi: 'यात्रा ट्रैक करते समय ऐप बंद न हो, इसलिए बैटरी प्रतिबंध हटाएं।',
     steps: [
       'Open Settings  →  search "Battery"  →  disable Power Saving Mode',
-      'Long press VEM Field app  →  App Info  →  Battery Usage  →  select Unrestricted',
+      'Long press EVM Field app  →  App Info  →  Battery Usage  →  select Unrestricted',
     ],
     stepsHi: [
-      'Settings kholein → "Battery" search karein → Power Saving Mode band karein',
-      'VEM Field app ko press karke rakho → App Info → Battery Usage → Unrestricted select karein',
+      'सेटिंग्स खोलें → "Battery" खोजें → Power Saving Mode बंद करें',
+      'EVM Field ऐप को देर तक दबाएं → App Info → Battery Usage → Unrestricted चुनें',
     ],
     action: null,
   },
   {
     id: 'screenshots',
     title: 'Upload proof screenshots',
-    titleHi: 'Battery settings ka screenshot upload karein',
+    titleHi: 'बैटरी सेटिंग्स का स्क्रीनशॉट अपलोड करें',
     body: 'Take a screenshot of your battery settings and upload it here so your manager knows the app is set up correctly.',
-    bodyHi: 'Battery settings ka screenshot lekar upload karein taaki manager ko pata chale ki app sahi se set hai.',
+    bodyHi: 'बैटरी सेटिंग्स का स्क्रीनशॉट लेकर यहाँ अपलोड करें, ताकि मैनेजर को पता चले कि ऐप सही तरह से सेट है।',
     action: 'screenshots',
     actionLabel: 'Upload Screenshots',
   },
   {
     id: 'notification',
     title: 'Stay notified',
-    body: 'Receive updates when your expense claims are approved or when your manager leaves feedback.',
+    body: 'Receive updates when your manager leaves feedback on your trips.',
     action: 'notification',
     actionLabel: 'Enable notifications',
   },
   {
     id: 'verify',
-    title: 'Is VEM Field working properly?',
-    body: 'While you are on a trip, you should see a notification like this. If you see it, VEM Field is running correctly in the background.',
+    title: 'Is EVM Field working properly?',
+    body: 'While you are on a trip, you will see a notification like this. If you see it, EVM Field is running correctly in the background.',
     action: null,
   },
   {
     id: 'finish',
     title: 'Setup finished',
-    body: 'You are all set. VEM Field is ready to track your trips and expenses.',
+    body: 'You are all set. EVM Field is ready to track your trips and distance.',
     action: null,
   },
 ];
@@ -144,19 +144,19 @@ function VerifyStep() {
             </svg>
           </div>
           <div>
-            <p style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', margin: 0 }}>VEM Field  •  now</p>
+            <p style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', margin: 0 }}>EVM Field  •  now</p>
             <p style={{ fontSize: 12, color: '#475569', margin: '2px 0 0' }}>Status: Trip in progress</p>
             <p style={{ fontSize: 12, color: '#475569', margin: 0 }}>Running in background</p>
           </div>
         </div>
         <div style={{ background: '#059669', borderRadius: 8, padding: '8px 12px' }}>
           <p style={{ fontSize: 12, color: '#fff', fontWeight: 600, margin: 0 }}>
-            This notification should be shown while you are on a trip
+            This notification will be shown while you are on a trip
           </p>
         </div>
       </div>
       <p style={{ fontSize: 13, color: '#64748b', lineHeight: 1.6, marginTop: 14, textAlign: 'center' }}>
-        If you do not see this notification during a trip, VEM Field may not be tracking properly.
+        If you do not see this notification during a trip, EVM Field may not be tracking properly.
       </p>
     </div>
   );
@@ -180,7 +180,7 @@ function FinishStep() {
       </div>
       <h1 style={{ fontSize: 32, fontWeight: 900, color: '#0f172a', margin: '0 0 12px', textAlign: 'center' }}>Setup finished</h1>
       <p style={{ fontSize: 15, color: '#64748b', textAlign: 'center', lineHeight: 1.6, margin: 0 }}>
-        You are all set. VEM Field is ready to track your trips and expenses.
+        You are all set. EVM Field is ready to track your trips and distance.
       </p>
     </div>
   );
@@ -278,13 +278,13 @@ export default function Onboarding() {
     if (step < STEPS.length - 1) {
       setStep(s => s + 1);
     } else {
-      localStorage.setItem('vem_onboarded', '1');
+      localStorage.setItem('evm_onboarded', '1');
       navigate('/', { replace: true });
     }
   }
 
   function skip() {
-    localStorage.setItem('vem_onboarded', '1');
+    localStorage.setItem('evm_onboarded', '1');
     navigate('/', { replace: true });
   }
 

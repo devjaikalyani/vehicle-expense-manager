@@ -11,7 +11,6 @@ L.Icon.Default.mergeOptions({
 });
 
 function fmt(n) { return parseFloat(n || 0).toFixed(1); }
-function fmtINR(n) { return '₹' + parseFloat(n || 0).toFixed(0); }
 function fmtTime(d) { return new Date(d).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }); }
 function fmtDateStr(s) {
   const [y, m, d] = s.split('-');
@@ -21,6 +20,28 @@ function localISO(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 function todayISO() { return localISO(new Date()); }
+
+function thinPoints(points, max) {
+  if (points.length <= max) return points;
+  const step = Math.ceil(points.length / max);
+  return points.filter((_, i) => i % step === 0 || i === points.length - 1);
+}
+
+async function matchToRoads(rawPts) {
+  try {
+    const thinned = thinPoints(rawPts, 99);
+    const coords = thinned.map(([lat, lng]) => `${lng},${lat}`).join(';');
+    const res = await fetch(
+      `https://router.project-osrm.org/match/v1/driving/${coords}?overview=full&geometries=geojson&tidy=true`,
+    ).then(r => r.json());
+    if (res.matchings?.length) {
+      return res.matchings.flatMap(m =>
+        m.geometry.coordinates.map(([lng, lat]) => [lat, lng]),
+      );
+    }
+  } catch { /* fall back to raw */ }
+  return rawPts;
+}
 
 function FitRoute({ points }) {
   const map = useMap();
@@ -49,36 +70,24 @@ export default function TripTimeline() {
     axios.get('/api/employees').then(r => setEmployees(r.data));
   }, []);
 
-  useEffect(() => {
-    if (!selectedEmp || !selectedDate) { setTrips([]); return; }
-    setLoading(true);
-    setActiveTrip(null);
-    setGpsPoints([]);
-    axios.get(`/api/trips?employee_id=${selectedEmp}&date=${selectedDate}`)
-      .then(r => setTrips(r.data))
-      .catch(() => setTrips([]))
-      .finally(() => setLoading(false));
-  }, [selectedEmp, selectedDate]);
-
-  const toggleRoute = async (trip) => {
-    if (activeTrip === trip.id) {
-      setActiveTrip(null);
-      setActiveTripData(null);
-      setGpsPoints([]);
-      setOsrmRoutes([]);
-      return;
-    }
+  const loadRoute = async (trip) => {
     setActiveTrip(trip.id);
     setActiveTripData(trip);
+    setGpsPoints([]);
     setOsrmRoutes([]);
     setGpsLoading(true);
     try {
       const res = await axios.get(`/api/gps/trip/${trip.id}`);
       const pts = res.data.map(p => [parseFloat(p.latitude), parseFloat(p.longitude)]);
-      setGpsPoints(pts);
 
-      // If no GPS tracks but start+end coords exist, reconstruct via OSRM
-      if (pts.length === 0 && trip.start_lat && trip.start_lng && trip.end_lat && trip.end_lng) {
+      if (pts.length > 1) {
+        // Snap GPS breadcrumbs to actual roads via OSRM map matching
+        const matched = await matchToRoads(pts);
+        setGpsPoints(matched);
+      } else if (pts.length === 1) {
+        setGpsPoints(pts);
+      } else if (trip.start_lat && trip.start_lng && trip.end_lat && trip.end_lng) {
+        // No GPS recorded — estimate route between start and end
         try {
           const url = `https://router.project-osrm.org/route/v1/driving/` +
             `${trip.start_lng},${trip.start_lat};${trip.end_lng},${trip.end_lat}` +
@@ -93,7 +102,7 @@ export default function TripTimeline() {
               }))
             );
           }
-        } catch { /* OSRM unavailable, silently skip */ }
+        } catch { /* OSRM unavailable */ }
       }
     } catch {
       setGpsPoints([]);
@@ -102,9 +111,35 @@ export default function TripTimeline() {
     }
   };
 
+  useEffect(() => {
+    if (!selectedEmp || !selectedDate) { setTrips([]); return; }
+    setLoading(true);
+    setActiveTrip(null);
+    setActiveTripData(null);
+    setGpsPoints([]);
+    setOsrmRoutes([]);
+    axios.get(`/api/trips?employee_id=${selectedEmp}&date=${selectedDate}`)
+      .then(r => {
+        setTrips(r.data);
+        if (r.data.length > 0) loadRoute(r.data[0]);
+      })
+      .catch(() => setTrips([]))
+      .finally(() => setLoading(false));
+  }, [selectedEmp, selectedDate]);
+
+  const toggleRoute = (trip) => {
+    if (activeTrip === trip.id) {
+      setActiveTrip(null);
+      setActiveTripData(null);
+      setGpsPoints([]);
+      setOsrmRoutes([]);
+      return;
+    }
+    loadRoute(trip);
+  };
+
   const empName = employees.find(e => String(e.id) === selectedEmp)?.name || '';
   const totalKm = trips.reduce((s, t) => s + parseFloat(t.manual_distance_km || t.gps_distance_km || 0), 0);
-  const totalExp = trips.reduce((s, t) => s + parseFloat(t.expense_amount || 0), 0);
 
   return (
     <div>
@@ -178,10 +213,6 @@ export default function TripTimeline() {
             <div className="stat-value" style={{ fontSize: '1.4rem' }}>{fmt(totalKm)}</div>
             <div className="stat-label">Total KM</div>
           </div>
-          <div className="stat-card stat-card-amber" style={{ flex: '1 1 120px', padding: '0.75rem 1rem' }}>
-            <div className="stat-value" style={{ fontSize: '1.4rem' }}>{fmtINR(totalExp)}</div>
-            <div className="stat-label">Total Expense</div>
-          </div>
         </div>
       )}
 
@@ -237,22 +268,17 @@ export default function TripTimeline() {
                         <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>
                           {fmtTime(trip.start_time)}{trip.end_time ? ` — ${fmtTime(trip.end_time)}` : ' (active)'}
                         </div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px', display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>
                           {(trip.manual_distance_km || trip.gps_distance_km) && (
                             <span>{fmt(trip.manual_distance_km || trip.gps_distance_km)} km</span>
                           )}
-                          {trip.vehicle_name && <span>{trip.vehicle_name}</span>}
-                          <span style={{ color: 'var(--brand-1)', fontWeight: '600' }}>{fmtINR(trip.expense_amount)}</span>
                         </div>
                       </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.3rem', flexShrink: 0 }}>
-                        <span className={`badge badge-${trip.status}`}>{trip.status}</span>
-                        {activeTrip === trip.id && (
-                          <span style={{ fontSize: '0.68rem', color: 'var(--brand-1)', fontWeight: '600' }}>
-                            {gpsLoading ? 'Loading...' : 'Route shown'}
-                          </span>
-                        )}
-                      </div>
+                      {activeTrip === trip.id && (
+                        <span style={{ fontSize: '0.68rem', color: 'var(--brand-1)', fontWeight: '600', flexShrink: 0 }}>
+                          {gpsLoading ? 'Loading...' : 'Route shown'}
+                        </span>
+                      )}
                     </div>
                   </div>
                 ))}

@@ -1,12 +1,12 @@
 {
   "name": "vehicle-expense-manager",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
   "scripts": {
-    "dev": "concurrently --names \"server,client\" --prefix-colors \"blue,green\" \"npm run dev --prefix server\" \"npm run dev --prefix client\"",
-    "build": "npm run build --prefix client",
+    "dev": "concurrently --names \"server,admin,mobile\" --prefix-colors \"blue,green,magenta\" \"npm run dev --prefix server\" \"npm run dev --prefix client-admin\" \"npm run dev --prefix client-mobile\"",
+    "build": "npm run build --prefix client-admin && npm run build --prefix client-mobile",
     "start": "node server/index.js",
-    "install:all": "npm install --prefix server && npm install --prefix client"
+    "install:all": "npm install --prefix server && npm install --prefix client-admin && npm install --prefix client-mobile"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

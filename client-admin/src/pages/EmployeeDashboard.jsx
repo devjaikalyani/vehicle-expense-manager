@@ -5,7 +5,6 @@ import { useAuth } from '../contexts/AuthContext';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 function fmt(n) { return parseFloat(n || 0).toFixed(1); }
-function fmtINR(n) { return '₹' + parseFloat(n || 0).toFixed(0); }
 function fmtDate(d) {
   return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 }
@@ -39,9 +38,8 @@ function getMonthlyData(trips) {
     });
     return {
       label: d.toLocaleString('en-IN', { month: 'short' }),
-      claimed: Math.round(monthTrips.reduce((s, t) => s + parseFloat(t.expense_amount || 0), 0)),
-      approved: Math.round(monthTrips.filter(t => t.status === 'approved').reduce((s, t) => s + parseFloat(t.expense_amount || 0), 0)),
       trips: monthTrips.length,
+      km: Math.round(monthTrips.reduce((s, t) => s + parseFloat(t.manual_distance_km || t.gps_distance_km || 0), 0)),
     };
   });
 }
@@ -60,9 +58,8 @@ export default function EmployeeDashboard() {
   const navigate = useNavigate();
   const [activeTrip, setActiveTrip] = useState(null);
   const [trips, setTrips] = useState([]);
-  const [vehicles, setVehicles] = useState([]);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ vehicle_id: localStorage.getItem('vem_last_vehicle') || '', purpose: '', start_odometer: '' });
+  const [form, setForm] = useState({ purpose: '', start_odometer: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [gpsStatus, setGpsStatus] = useState('');
@@ -72,14 +69,12 @@ export default function EmployeeDashboard() {
 
   const fetchData = async () => {
     try {
-      const [activeRes, tripsRes, vehiclesRes] = await Promise.all([
+      const [activeRes, tripsRes] = await Promise.all([
         axios.get('/api/trips/active'),
         axios.get('/api/trips'),
-        axios.get('/api/employees/vehicles'),
       ]);
       setActiveTrip(activeRes.data);
       setTrips(tripsRes.data.filter(t => t.status !== 'active'));
-      setVehicles(vehiclesRes.data);
     } catch (err) {
       console.error(err);
     }
@@ -112,9 +107,7 @@ export default function EmployeeDashboard() {
     try {
       const pos = await getPosition();
       setGpsStatus('Starting trip...');
-      if (form.vehicle_id) localStorage.setItem('vem_last_vehicle', form.vehicle_id);
       await axios.post('/api/trips/start', {
-        vehicle_id: form.vehicle_id || null,
         purpose: form.purpose,
         start_odometer: form.start_odometer || null,
         start_lat: pos.coords.latitude,
@@ -138,8 +131,6 @@ export default function EmployeeDashboard() {
     return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
   });
   const totalKm = completedTrips.reduce((s, t) => s + parseFloat(t.manual_distance_km || t.gps_distance_km || 0), 0);
-  const totalExp = completedTrips.reduce((s, t) => s + parseFloat(t.expense_amount || 0), 0);
-  const pendingAmt = completedTrips.filter(t => t.status === 'pending').reduce((s, t) => s + parseFloat(t.expense_amount || 0), 0);
 
   return (
     <div>
@@ -180,61 +171,9 @@ export default function EmployeeDashboard() {
       {/* Stat cards */}
       <div className="stats-grid">
         <StatCard value={fmt(totalKm)} label="Total KM" gradClass="stat-card-indigo" />
-        <StatCard value={fmtINR(totalExp)} label="Total Claimed" gradClass="stat-card-ocean" />
-        <StatCard
-          value={fmtINR(pendingAmt)}
-          label="Pending"
-          gradClass={pendingAmt > 0 ? 'stat-card-amber' : 'stat-card-emerald'}
-        />
         <StatCard value={thisMonthTrips.length} label="This Month" gradClass="stat-card-indigo" />
       </div>
 
-      {/* Spending trend chart */}
-      {completedTrips.length > 0 && (() => {
-        const chartData = getMonthlyData(completedTrips);
-        const hasAny = chartData.some(d => d.claimed > 0);
-        if (!hasAny) return null;
-        return (
-          <div className="card" style={{ marginBottom: '1.1rem' }}>
-            <div className="section-header" style={{ marginBottom: '0.75rem' }}>
-              <span className="section-title">Spending Trend</span>
-              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Last 6 months</span>
-            </div>
-            <ResponsiveContainer width="100%" height={170}>
-              <AreaChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="gclaimed" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#667eea" stopOpacity={0.28} />
-                    <stop offset="95%" stopColor="#667eea" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="gapproved" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.28} />
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.15)" />
-                <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} width={44} tickFormatter={v => v >= 1000 ? `${Math.round(v / 1000)}k` : v} />
-                <Tooltip
-                  formatter={(v, name) => [`₹${v.toLocaleString('en-IN')}`, name === 'claimed' ? 'Claimed' : 'Approved']}
-                  contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border-solid)', borderRadius: '10px', fontSize: '0.8rem' }}
-                  labelStyle={{ fontWeight: '600', marginBottom: '2px' }}
-                />
-                <Area type="monotone" dataKey="claimed" stroke="#667eea" strokeWidth={2.5} fill="url(#gclaimed)" dot={false} />
-                <Area type="monotone" dataKey="approved" stroke="#10b981" strokeWidth={2.5} fill="url(#gapproved)" dot={false} />
-              </AreaChart>
-            </ResponsiveContainer>
-            <div style={{ display: 'flex', gap: '1.2rem', marginTop: '0.5rem', justifyContent: 'center' }}>
-              {[['#667eea', 'Claimed'], ['#10b981', 'Approved']].map(([color, label]) => (
-                <span key={label} style={{ fontSize: '0.75rem', color, display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                  <span style={{ width: 14, height: 2.5, background: color, display: 'inline-block', borderRadius: 2 }} />
-                  {label}
-                </span>
-              ))}
-            </div>
-          </div>
-        );
-      })()}
 
       {/* Active trip banner */}
       {activeTrip && (
@@ -258,20 +197,9 @@ export default function EmployeeDashboard() {
           <form onSubmit={startTrip}>
             {error && <div className="alert alert-error">{error}</div>}
             {gpsStatus && <div className="alert alert-info">{gpsStatus}</div>}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0 1rem' }}>
-              <div className="form-group">
-                <label>Vehicle</label>
-                <select value={form.vehicle_id} onChange={e => setForm({ ...form, vehicle_id: e.target.value })}>
-                  <option value="">No vehicle / select later</option>
-                  {vehicles.map(v => (
-                    <option key={v.id} value={v.id}>{v.name} · {v.registration_number} ({v.type?.replace('_', '-')})</option>
-                  ))}
-                </select>
-              </div>
-              <div className="form-group">
-                <label>Start Odometer (km) — optional</label>
-                <input type="number" value={form.start_odometer} onChange={e => setForm({ ...form, start_odometer: e.target.value })} placeholder="e.g. 12500" min="0" step="0.1" />
-              </div>
+            <div className="form-group">
+              <label>Start Odometer (km) — optional</label>
+              <input type="number" value={form.start_odometer} onChange={e => setForm({ ...form, start_odometer: e.target.value })} placeholder="e.g. 12500" min="0" step="0.1" />
             </div>
             <div className="form-group">
               <label>Purpose / Destination *</label>
@@ -344,7 +272,6 @@ export default function EmployeeDashboard() {
                     <span>{fmtDate(trip.start_time)}</span>
                     {trip.vehicle_name && <span>{trip.vehicle_name}</span>}
                     <span>{fmt(trip.manual_distance_km || trip.gps_distance_km)} km</span>
-                    <span style={{ fontWeight: '700', color: 'var(--brand-1)' }}>{fmtINR(trip.expense_amount)}</span>
                   </div>
                 </div>
                 <span className={`badge badge-${trip.status}`}>{trip.status}</span>

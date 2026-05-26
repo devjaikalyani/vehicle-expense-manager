@@ -1,10 +1,19 @@
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 const db = require('../db');
 const { authenticateToken } = require('../middleware/auth');
 
 const router = express.Router();
 
-router.post('/track', authenticateToken, async (req, res) => {
+const gpsLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  message: { error: 'Too many GPS updates. Please slow down.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+router.post('/track', authenticateToken, gpsLimiter, async (req, res) => {
   const { trip_id, latitude, longitude, speed } = req.body;
   if (!trip_id || latitude == null || longitude == null) {
     return res.status(400).json({ error: 'trip_id, latitude, longitude required' });

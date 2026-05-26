@@ -1,8 +1,10 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { io } from 'socket.io-client';
 import { enqueue, flush } from './gpsQueue';
+import { useAuth } from './App';
 
-const MIN_INTERVAL_MS = 15000;
-const MIN_DISTANCE_M = 20;
+const MIN_INTERVAL_MS = 5000;
+const MIN_DISTANCE_M = 10;
 
 function haversineM(lat1, lng1, lat2, lng2) {
   const R = 6371000;
@@ -16,35 +18,72 @@ function haversineM(lat1, lng1, lat2, lng2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+// Returns liveKm. Single watchPosition handles server posting + live map + km display.
 export function useGpsTracking(tripId) {
+  const { user } = useAuth();
+  const [liveKm, setLiveKm] = useState(0);
   const lastPostRef = useRef(0);
   const lastPosRef = useRef(null);
+  const accKmRef = useRef(0);
   const watchIdRef = useRef(null);
+  const socketRef = useRef(null);
+  const wakeLockRef = useRef(null);
 
-  // Flush queued points whenever network comes back
+  async function acquireWakeLock() {
+    if (!('wakeLock' in navigator)) return;
+    try {
+      wakeLockRef.current = await navigator.wakeLock.request('screen');
+    } catch {}
+  }
+
   useEffect(() => {
     window.addEventListener('online', flush);
-    flush(); // also attempt on mount
+    flush();
     return () => window.removeEventListener('online', flush);
   }, []);
+
+  // Re-acquire wake lock when tab becomes visible again (OS releases it on hide)
+  useEffect(() => {
+    if (!tripId) return;
+    function onVisibilityChange() {
+      if (document.visibilityState === 'visible') acquireWakeLock();
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange);
+  }, [tripId]);
 
   useEffect(() => {
     if (!tripId || !navigator.geolocation) return;
 
+    accKmRef.current = 0;
+    lastPosRef.current = null;
+    setLiveKm(0);
+
+    acquireWakeLock();
+    socketRef.current = io({ path: '/socket.io' });
+
     function onPosition(pos) {
       const { latitude, longitude, speed } = pos.coords;
       const now = Date.now();
-
       const last = lastPosRef.current;
-      const tooSoon = now - lastPostRef.current < MIN_INTERVAL_MS;
-      const tooClose =
-        last && haversineM(last.lat, last.lng, latitude, longitude) < MIN_DISTANCE_M;
+      const dist = last ? haversineM(last.lat, last.lng, latitude, longitude) : 0;
 
+      // Accumulate live km for any movement > 5 m (noise filter)
+      if (last && dist > 5) {
+        accKmRef.current += dist / 1000;
+        setLiveKm(+(accKmRef.current.toFixed(2)));
+      }
+
+      lastPosRef.current = { lat: latitude, lng: longitude };
+
+      // Post to server only if enough time OR distance has passed
+      const tooSoon = now - lastPostRef.current < MIN_INTERVAL_MS;
+      const tooClose = dist < MIN_DISTANCE_M;
       if (tooSoon && tooClose) return;
 
       lastPostRef.current = now;
-      lastPosRef.current = { lat: latitude, lng: longitude };
 
+      // REST — persists GPS breadcrumbs for trip route history
       enqueue({
         trip_id: tripId,
         latitude,
@@ -52,15 +91,23 @@ export function useGpsTracking(tripId) {
         speed: speed ?? 0,
         timestamp: new Date().toISOString(),
       });
-
-      // Try to flush immediately — if offline, stays queued
       flush();
+
+      // Socket.IO — pushes live location to admin map in real time
+      socketRef.current?.emit('gps:update', {
+        userId: user?.id,
+        name: user?.name,
+        tripId,
+        lat: latitude,
+        lng: longitude,
+        speed: speed ?? 0,
+      });
     }
 
     watchIdRef.current = navigator.geolocation.watchPosition(
       onPosition,
       () => {},
-      { enableHighAccuracy: true, maximumAge: 10000, timeout: 30000 }
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 30000 },
     );
 
     return () => {
@@ -68,6 +115,13 @@ export function useGpsTracking(tripId) {
         navigator.geolocation.clearWatch(watchIdRef.current);
         watchIdRef.current = null;
       }
+      socketRef.current?.emit('gps:stop', { userId: user?.id });
+      socketRef.current?.disconnect();
+      socketRef.current = null;
+      wakeLockRef.current?.release();
+      wakeLockRef.current = null;
     };
   }, [tripId]);
+
+  return liveKm;
 }

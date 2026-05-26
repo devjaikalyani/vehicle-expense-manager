@@ -64,14 +64,17 @@ export default function EndTrip() {
   const [endOdometer, setEndOdometer] = useState('');
   const [photo, setPhoto] = useState(null);
   const [preview, setPreview] = useState(null);
-  const [fuelAmount, setFuelAmount] = useState('');
-  const [fuelLiters, setFuelLiters] = useState('');
-  const [fuelType, setFuelType] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(null);
   const [showScanner, setShowScanner] = useState(false);
+  const [timeLimitExceeded, setTimeLimitExceeded] = useState(false);
   const fileRef = useRef(null);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setTimeLimitExceeded(true), 60000);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     api.activeTrip().then(t => {
@@ -80,10 +83,9 @@ export default function EndTrip() {
     }).catch(() => navigate('/', { replace: true }));
   }, [navigate]);
 
-  async function handleScanCapture(blob) {
-    const compressed = await compressImage(blob);
-    setPhoto(compressed);
-    setPreview(URL.createObjectURL(compressed));
+  function handleScanCapture(file) {
+    setPhoto(file);
+    setPreview(URL.createObjectURL(file));
     setShowScanner(false);
   }
 
@@ -105,13 +107,24 @@ export default function EndTrip() {
     setLoading(true);
     try {
       const pos = await getCurrentPosition();
+      let end_address = null;
+      if (pos) {
+        try {
+          const r = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${pos.lat}&lon=${pos.lng}&format=json`,
+            { headers: { 'Accept-Language': 'en' } }
+          );
+          const data = await r.json();
+          const addr = data.address || {};
+          const parts = [addr.suburb || addr.neighbourhood, addr.city || addr.town || addr.village, addr.state].filter(Boolean);
+          if (parts.length) end_address = parts.join(', ');
+        } catch {}
+      }
       await api.endTrip(trip.id, {
         end_odometer: endOdometer ? parseFloat(endOdometer) : null,
-        fuel_expense_amount: fuelAmount ? parseFloat(fuelAmount) : null,
-        fuel_liters: fuelLiters ? parseFloat(fuelLiters) : null,
-        fuel_type: fuelType || null,
         end_lat: pos?.lat ?? null,
         end_lng: pos?.lng ?? null,
+        end_address,
       });
       if (photo) await api.uploadPhotos(trip.id, [photo]);
       setDone({ distance, purpose: trip.purpose, id: trip.id });
@@ -174,6 +187,30 @@ export default function EndTrip() {
 
   return (
     <>
+      {timeLimitExceeded && !done && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 24 }}>
+          <div style={{ background: '#fff', borderRadius: 18, padding: '28px 24px', maxWidth: 320, width: '100%', textAlign: 'center', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+            <div style={{ width: 52, height: 52, borderRadius: '50%', background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+            </div>
+            <h3 style={{ fontSize: 17, fontWeight: 700, color: '#0f172a', margin: '0 0 10px' }}>Time Limit Exceeded</h3>
+            <p style={{ fontSize: 14, color: '#64748b', margin: '0 0 24px', lineHeight: 1.5 }}>
+              1 minute time limit has exceeded for submission.
+            </p>
+            <button
+              onClick={() => navigate('/', { replace: true })}
+              style={{ width: '100%', padding: '13px', borderRadius: 12, background: '#059669', color: '#fff', border: 'none', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
+
       {showScanner && (
         <OdometerScanner
           onCapture={handleScanCapture}
@@ -324,47 +361,6 @@ export default function EndTrip() {
               </button>
             </div>
 
-            {/* Fuel expense */}
-            <div style={{ background: '#fff', borderRadius: 18, padding: 16, marginBottom: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
-              <p style={{ fontSize: 12, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>
-                Fuel Expense (optional)
-              </p>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: 11, color: '#94a3b8', fontWeight: 600, marginBottom: 6 }}>Amount (Rs.)</label>
-                  <input
-                    type="number"
-                    value={fuelAmount}
-                    onChange={e => setFuelAmount(e.target.value)}
-                    placeholder="0"
-                    inputMode="decimal"
-                    style={{ width: '100%', padding: '10px 12px', border: '1.5px solid #e2e8f0', borderRadius: 10, fontSize: 15, background: '#f8fafc', outline: 'none', boxSizing: 'border-box' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: 11, color: '#94a3b8', fontWeight: 600, marginBottom: 6 }}>Liters</label>
-                  <input
-                    type="number"
-                    value={fuelLiters}
-                    onChange={e => setFuelLiters(e.target.value)}
-                    placeholder="0"
-                    inputMode="decimal"
-                    style={{ width: '100%', padding: '10px 12px', border: '1.5px solid #e2e8f0', borderRadius: 10, fontSize: 15, background: '#f8fafc', outline: 'none', boxSizing: 'border-box' }}
-                  />
-                </div>
-              </div>
-              <select
-                value={fuelType}
-                onChange={e => setFuelType(e.target.value)}
-                style={{ width: '100%', padding: '10px 12px', border: '1.5px solid #e2e8f0', borderRadius: 10, fontSize: 14, background: '#f8fafc', outline: 'none', color: fuelType ? '#0f172a' : '#94a3b8' }}
-              >
-                <option value="">Fuel type (optional)</option>
-                <option value="petrol">Petrol</option>
-                <option value="diesel">Diesel</option>
-                <option value="cng">CNG</option>
-                <option value="electric">Electric</option>
-              </select>
-            </div>
 
             {error && (
               <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, padding: '10px 14px', marginBottom: 12, color: '#dc2626', fontSize: 14 }}>

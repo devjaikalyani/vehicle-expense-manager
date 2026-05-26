@@ -12,6 +12,11 @@ export default function Profile() {
   const [phone, setPhone] = useState(user?.phone || '');
   const [saving, setSaving] = useState(false);
   const [editError, setEditError] = useState('');
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSuccess, setPasswordSuccess] = useState('');
+  const [savingPassword, setSavingPassword] = useState(false);
 
   async function handleLogout() {
     setLoggingOut(true);
@@ -33,6 +38,26 @@ export default function Profile() {
       setEditError(err.message);
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handlePasswordChange() {
+    if (!newPassword || newPassword.length < 6) {
+      setPasswordError('Password must be at least 6 characters');
+      return;
+    }
+    setPasswordError('');
+    setPasswordSuccess('');
+    setSavingPassword(true);
+    try {
+      await api.changePassword(newPassword);
+      setPasswordSuccess('Password updated successfully');
+      setNewPassword('');
+      setTimeout(() => { setShowPasswordForm(false); setPasswordSuccess(''); }, 2000);
+    } catch (err) {
+      setPasswordError(err.message);
+    } finally {
+      setSavingPassword(false);
     }
   }
 
@@ -121,6 +146,48 @@ export default function Profile() {
 
           <InfoRow label="Employee Code" value={user?.employee_code || 'Not assigned'} dim={!user?.employee_code} />
           <InfoRow label="Role" value={user?.role} capitalize last />
+        </div>
+
+
+        {/* Change password card */}
+        <div style={{ background: '#fff', borderRadius: 18, overflow: 'hidden', marginBottom: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', borderBottom: showPasswordForm ? '1px solid #f1f5f9' : 'none' }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>Change Password</span>
+            <button
+              onClick={() => { setShowPasswordForm(v => !v); setPasswordError(''); setPasswordSuccess(''); setNewPassword(''); }}
+              style={{ fontSize: 13, fontWeight: 600, color: '#1e40af', background: '#eff6ff', padding: '4px 12px', borderRadius: 20, border: 'none', cursor: 'pointer' }}
+            >
+              {showPasswordForm ? 'Cancel' : 'Change'}
+            </button>
+          </div>
+          {showPasswordForm && (
+            <div style={{ padding: '14px 16px' }}>
+              {passwordError && (
+                <div style={{ background: '#fef2f2', borderRadius: 8, padding: '8px 12px', color: '#dc2626', fontSize: 13, marginBottom: 10 }}>
+                  {passwordError}
+                </div>
+              )}
+              {passwordSuccess && (
+                <div style={{ background: '#f0fdf4', borderRadius: 8, padding: '8px 12px', color: '#16a34a', fontSize: 13, marginBottom: 10 }}>
+                  {passwordSuccess}
+                </div>
+              )}
+              <input
+                type="password"
+                value={newPassword}
+                onChange={e => setNewPassword(e.target.value)}
+                placeholder="New password (min 6 characters)"
+                style={{ width: '100%', padding: '12px 14px', border: '1.5px solid #e2e8f0', borderRadius: 10, fontSize: 14, outline: 'none', boxSizing: 'border-box', marginBottom: 10 }}
+              />
+              <button
+                onClick={handlePasswordChange}
+                disabled={savingPassword}
+                style={{ width: '100%', padding: '12px', borderRadius: 10, background: savingPassword ? '#93c5fd' : '#1e40af', color: '#fff', border: 'none', fontSize: 14, fontWeight: 600, cursor: savingPassword ? 'default' : 'pointer' }}
+              >
+                {savingPassword ? 'Updating...' : 'Update Password'}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Sign out */}

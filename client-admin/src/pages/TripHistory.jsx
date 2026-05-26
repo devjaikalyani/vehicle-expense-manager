@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import * as XLSX from 'xlsx';
 import { useAuth } from '../contexts/AuthContext';
 
 const STATUS_FILTERS = ['all', 'pending', 'approved', 'rejected'];
 
 function fmt(n) { return parseFloat(n || 0).toFixed(1); }
-function fmtINR(n) { return '₹' + parseFloat(n || 0).toFixed(0); }
 function fmtDate(d) { return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }); }
 function fmtTime(d) { return new Date(d).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }); }
 function duration(start, end) {
@@ -78,34 +78,26 @@ export default function TripHistory() {
       (t.vehicle_name || '').toLowerCase().includes(search.toLowerCase())
     );
   const totalKm = filtered.reduce((s, t) => s + parseFloat(t.manual_distance_km || t.gps_distance_km || 0), 0);
-  const totalExp = filtered.reduce((s, t) => s + parseFloat(t.expense_amount || 0), 0);
-  const approvedExp = filtered.filter(t => t.status === 'approved').reduce((s, t) => s + parseFloat(t.expense_amount || 0), 0);
 
   const exportCSV = () => {
     const rows = [
-      ['Date', 'Purpose', 'Vehicle', 'Start Odo', 'End Odo', 'Odometer KM', 'GPS KM', 'Fuel Type', 'Fuel Liters', 'Fuel Exp', 'Total Exp', 'Status', 'Manager Notes'],
+      ['Date', 'Purpose', 'Vehicle', 'Start Odo', 'End Odo', 'Odometer KM', 'GPS KM', 'Status', 'Manager Notes'],
       ...filtered.map(t => [
         fmtDate(t.start_time),
         t.purpose || '',
         t.vehicle_name ? `${t.vehicle_name} (${t.registration_number})` : '',
-        t.start_odometer || '',
-        t.end_odometer || '',
-        fmt(t.manual_distance_km),
-        fmt(t.gps_distance_km),
-        t.fuel_type || '',
-        t.fuel_liters || '',
-        parseFloat(t.fuel_expense_amount || 0).toFixed(2),
-        parseFloat(t.expense_amount || 0).toFixed(2),
+        t.start_odometer ? parseFloat(t.start_odometer) : '',
+        t.end_odometer ? parseFloat(t.end_odometer) : '',
+        parseFloat(fmt(t.manual_distance_km)),
+        parseFloat(fmt(t.gps_distance_km)),
         t.status,
         t.manager_notes || '',
       ]),
     ];
-    const csv = rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n');
-    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = `trips-${filter}-${new Date().toISOString().slice(0, 10)}.csv`; a.click();
-    URL.revokeObjectURL(url);
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Trips');
+    XLSX.writeFile(wb, `trips-${filter}-${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
   return (
@@ -118,8 +110,6 @@ export default function TripHistory() {
       <div className="stats-grid">
         <div className="stat-card stat-card-indigo"><div className="stat-value">{filtered.length}</div><div className="stat-label">Trips</div></div>
         <div className="stat-card stat-card-ocean"><div className="stat-value">{fmt(totalKm)}</div><div className="stat-label">Total KM</div></div>
-        <div className="stat-card stat-card-indigo"><div className="stat-value">{fmtINR(totalExp)}</div><div className="stat-label">Claimed</div></div>
-        <div className="stat-card stat-card-emerald"><div className="stat-value">{fmtINR(approvedExp)}</div><div className="stat-label">Approved</div></div>
       </div>
 
       <div className="card">
@@ -131,7 +121,7 @@ export default function TripHistory() {
               </button>
             ))}
           </div>
-          <button className="btn btn-ghost btn-sm" onClick={exportCSV}>Export CSV</button>
+          <button className="btn btn-ghost btn-sm" onClick={exportCSV}>Export Excel File</button>
         </div>
         {/* Search bar */}
         <div style={{
@@ -221,10 +211,6 @@ export default function TripHistory() {
                     <div className="trip-meta" style={{ marginTop: '0.2rem' }}>
                       {trip.manual_distance_km != null && <span>Odo: <strong>{fmt(trip.manual_distance_km)} km</strong></span>}
                       {trip.gps_distance_km != null && <span>GPS: <strong>{fmt(trip.gps_distance_km)} km</strong></span>}
-                      {parseFloat(trip.fuel_expense_amount || 0) > 0 && (
-                        <span>Fuel ({trip.fuel_type}): <strong>{fmtINR(trip.fuel_expense_amount)}</strong></span>
-                      )}
-                      <span style={{ fontWeight: '700', color: '#1e40af', fontSize: '0.9rem' }}>{fmtINR(trip.expense_amount)}</span>
                     </div>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.3rem' }}>
@@ -241,7 +227,6 @@ export default function TripHistory() {
                   >
                     {trip.start_odometer && <div style={{ color: '#475569' }}>Start odometer: {parseFloat(trip.start_odometer).toFixed(1)} km</div>}
                     {trip.end_odometer && <div style={{ color: '#475569' }}>End odometer: {parseFloat(trip.end_odometer).toFixed(1)} km</div>}
-                    {trip.fuel_liters && <div style={{ color: '#475569' }}>Fuel filled: {trip.fuel_liters} L ({trip.fuel_type})</div>}
                     {trip.manager_notes && (
                       <div style={{ marginTop: '0.4rem', color: '#92400e', fontStyle: 'italic' }}>
                         Manager note: {trip.manager_notes}

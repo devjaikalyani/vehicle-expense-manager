@@ -8,7 +8,6 @@ export default function Navbar() {
   const { pathname } = useLocation();
   const [open, setOpen] = useState(false);
 
-  const isManager = user?.role === 'manager' || user?.role === 'admin';
   const handleLogout = () => { logout(); navigate('/login'); setOpen(false); };
 
   const link = (to, label) => (
@@ -25,14 +24,12 @@ export default function Navbar() {
   return (
     <>
       <nav className="navbar">
-        <div className="navbar-brand">Vehicle Expense Manager</div>
+        <div className="navbar-brand">EVM Admin</div>
 
         <div className="navbar-links">
-          {link('/', 'Dashboard')}
-          {!isManager && link('/trips', 'My Trips')}
-          {isManager && link('/manager', 'Manager')}
-          {isManager && link('/live-map', 'Live Map')}
-          {isManager && link('/timeline', 'Timeline')}
+          {link('/manager', 'Dashboard')}
+          {link('/live-map', 'Live Map')}
+          {link('/timeline', 'Timeline')}
           <Link
             to="/profile"
             style={{
@@ -63,12 +60,10 @@ export default function Navbar() {
       </nav>
 
       <div className={`mobile-nav ${open ? 'open' : ''}`}>
-        {link('/', 'Dashboard')}
-        {!isManager && link('/trips', 'My Trips')}
-        {isManager && link('/manager', 'Manager')}
-        {isManager && link('/live-map', 'Live Map')}
-        {isManager && link('/timeline', 'Timeline')}
-        {link('/profile', 'My Profile')}
+        {link('/manager', 'Dashboard')}
+        {link('/live-map', 'Live Map')}
+        {link('/timeline', 'Timeline')}
+        {link('/profile', 'Profile')}
         <div className="mobile-nav-footer">
           <span className="navbar-user" style={{ borderLeft: 'none', marginLeft: 0 }}>{user?.name}</span>
           <button className="btn-logout" onClick={handleLogout}>Logout</button>

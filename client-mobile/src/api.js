@@ -23,6 +23,7 @@ export const api = {
   sendOtp: (email) => post('/auth/send-otp', { email }),
   verifyOtp: (email, otp, mode) => post('/auth/verify-otp', { email, otp, mode }),
   resetPassword: (resetToken, new_password, name) => post('/auth/reset-password', { resetToken, new_password, name }),
+  changePassword: (new_password) => req('/auth/password', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ new_password }) }),
   vehicles: () => req('/employees/vehicles'),
   activeTrip: () => req('/trips/active'),
   startTrip: (data) => post('/trips/start', data),
@@ -36,7 +37,11 @@ export const api = {
       method: 'POST',
       credentials: 'include',
       body: form,
-    }).then((r) => r.json());
+    }).then(async (r) => {
+      const json = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(json.error || r.statusText);
+      return json;
+    });
   },
   receipts: (tripId) => req(`/receipts/${tripId}`),
   gpsTrack: (tripId) => req(`/gps/trip/${tripId}`),

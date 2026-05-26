@@ -50,8 +50,6 @@ function formatElapsed(startTime) {
   return h > 0 ? `${h}h ${m}m` : `${m}m ${s}s`;
 }
 
-const FUEL_TYPES = ['Petrol', 'Diesel', 'CNG', 'Electric'];
-
 export default function ActiveTrip() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -64,7 +62,6 @@ export default function ActiveTrip() {
 
   // End-trip form state
   const [endOdometer, setEndOdometer] = useState('');
-  const [fuel, setFuel] = useState({ enabled: false, type: 'Petrol', liters: '', amount: '' });
   const [receipts, setReceipts] = useState([]); // File objects
   const [receiptPreviews, setReceiptPreviews] = useState([]);
 
@@ -117,7 +114,7 @@ export default function ActiveTrip() {
         }
       },
       (err) => {
-        if (err.code === 1) setError('GPS denied — only odometer distance will be used for billing.');
+        if (err.code === 1) setError('GPS denied — only odometer distance will be recorded.');
         else setError('GPS error: ' + err.message);
       },
       { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 }
@@ -144,7 +141,7 @@ export default function ActiveTrip() {
   };
 
   const endTrip = async () => {
-    if (!window.confirm('End this trip and submit for approval?')) return;
+    if (!window.confirm('End this trip?')) return;
     setLoading(true);
     setError('');
     try {
@@ -166,9 +163,6 @@ export default function ActiveTrip() {
         end_lng: currentPos?.[1] ?? null,
         end_address: currentPos ? `${currentPos[0].toFixed(5)}, ${currentPos[1].toFixed(5)}` : null,
         gps_distance_km: gpsKm,
-        fuel_expense_amount: fuel.enabled && fuel.amount ? parseFloat(fuel.amount) : 0,
-        fuel_liters: fuel.enabled && fuel.liters ? parseFloat(fuel.liters) : null,
-        fuel_type: fuel.enabled ? fuel.type : null,
       });
 
       socketRef.current?.emit('gps:stop', { userId: user.id });
@@ -188,7 +182,6 @@ export default function ActiveTrip() {
   const odomKm = trip.start_odometer && endOdometer
     ? Math.max(0, parseFloat(endOdometer) - parseFloat(trip.start_odometer))
     : null;
-  const fuelAmt = fuel.enabled && fuel.amount ? parseFloat(fuel.amount) : 0;
   const center = currentPos ?? (route[0] || [20.5937, 78.9629]);
   const startPt = trip.start_lat ? [parseFloat(trip.start_lat), parseFloat(trip.start_lng)] : null;
 
@@ -252,56 +245,9 @@ export default function ActiveTrip() {
         </div>
         {odomKm != null && (
           <div className="alert alert-info" style={{ marginBottom: '1rem', fontSize: '0.82rem' }}>
-            Odometer: <strong>{odomKm.toFixed(1)} km</strong> · GPS: <strong>{gpsKm.toFixed(2)} km</strong> · Odometer used for billing
+            Odometer: <strong>{odomKm.toFixed(1)} km</strong> · GPS: <strong>{gpsKm.toFixed(2)} km</strong>
           </div>
         )}
-
-        {/* ── Fuel expense ── */}
-        <div style={{ border: '1.5px solid #e2e8f0', borderRadius: '10px', padding: '1rem', marginBottom: '1rem' }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontWeight: '600', fontSize: '0.9rem', marginBottom: fuel.enabled ? '0.85rem' : 0 }}>
-            <input
-              type="checkbox"
-              checked={fuel.enabled}
-              onChange={e => setFuel({ ...fuel, enabled: e.target.checked })}
-              style={{ width: 'auto' }}
-            />
-            Add Fuel Expense
-          </label>
-
-          {fuel.enabled && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0 1rem' }}>
-              <div className="form-group">
-                <label>Fuel Type</label>
-                <select value={fuel.type} onChange={e => setFuel({ ...fuel, type: e.target.value })}>
-                  {FUEL_TYPES.map(t => <option key={t}>{t}</option>)}
-                </select>
-              </div>
-              <div className="form-group">
-                <label>Liters Filled (optional)</label>
-                <input
-                  type="number"
-                  value={fuel.liters}
-                  onChange={e => setFuel({ ...fuel, liters: e.target.value })}
-                  placeholder="e.g. 5.5"
-                  min="0"
-                  step="0.1"
-                />
-              </div>
-              <div className="form-group">
-                <label>Amount Paid (Rs.) *</label>
-                <input
-                  type="number"
-                  value={fuel.amount}
-                  onChange={e => setFuel({ ...fuel, amount: e.target.value })}
-                  placeholder="e.g. 350"
-                  min="0"
-                  step="1"
-                  required={fuel.enabled}
-                />
-              </div>
-            </div>
-          )}
-        </div>
 
         {/* ── Receipt upload ── */}
         <div style={{ border: '1.5px solid #e2e8f0', borderRadius: '10px', padding: '1rem', marginBottom: '1rem' }}>
@@ -332,24 +278,16 @@ export default function ActiveTrip() {
           )}
         </div>
 
-        {/* Summary before submitting */}
-        {(odomKm != null || fuelAmt > 0) && (
-          <div className="alert alert-success" style={{ marginBottom: '1rem', fontSize: '0.82rem' }}>
-            KM expense: <strong>Rs.{((odomKm ?? gpsKm) * 0).toFixed(0)}</strong> (calculated server-side) ·
-            Fuel: <strong>Rs.{fuelAmt.toFixed(0)}</strong>
-          </div>
-        )}
-
         <button
           className="btn btn-danger"
           onClick={endTrip}
-          disabled={loading || (fuel.enabled && !fuel.amount)}
+          disabled={loading}
           style={{ width: '100%', padding: '0.85rem', fontSize: '1rem' }}
         >
-          {loading ? 'Submitting...' : 'End Trip & Submit for Approval'}
+          {loading ? 'Submitting...' : 'End Trip'}
         </button>
         <p style={{ textAlign: 'center', color: '#94a3b8', fontSize: '0.75rem', marginTop: '0.6rem' }}>
-          GPS route, odometer, fuel, and receipts will all be saved
+          GPS route, odometer, and receipts will all be saved
         </p>
       </div>
     </div>

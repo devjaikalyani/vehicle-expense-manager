@@ -12,14 +12,6 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 });
 
-function statusInfo(status) {
-  return {
-    active:   { bg: '#dbeafe', color: '#1e40af', label: 'Active' },
-    pending:  { bg: '#fffbeb', color: '#d97706', label: 'Pending Review' },
-    approved: { bg: '#f0fdf4', color: '#16a34a', label: 'Approved' },
-    rejected: { bg: '#fef2f2', color: '#dc2626', label: 'Rejected' },
-  }[status] || { bg: '#fffbeb', color: '#d97706', label: 'Pending Review' };
-}
 
 function StatBox({ label, value, sub }) {
   return (
@@ -113,7 +105,6 @@ export default function TripDetail() {
 
   if (!trip) return null;
 
-  const ss = statusInfo(trip.status);
   const km = trip.manual_distance_km ?? trip.gps_distance_km;
   const startTime = new Date(trip.start_time);
   const endTime = trip.end_time ? new Date(trip.end_time) : null;
@@ -142,11 +133,7 @@ export default function TripDetail() {
           <h1 style={{ fontSize: 18, fontWeight: 700 }}>{trip.purpose || 'Trip'}</h1>
           <p style={{ fontSize: 12, opacity: 0.7, marginTop: 2 }}>
             {startTime.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
-            {trip.vehicle_name ? ` · ${trip.vehicle_name}` : ''}
           </p>
-        </div>
-        <div style={{ background: ss.bg, borderRadius: 20, padding: '4px 10px', flexShrink: 0 }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: ss.color }}>{ss.label}</span>
         </div>
       </div>
 
@@ -164,27 +151,22 @@ export default function TripDetail() {
           {endTime && <StatBox label="End Time" value={fmt(endTime)} />}
         </div>
 
-        {/* Expense card */}
-        <div style={{
-          background: 'linear-gradient(135deg, #1e40af 0%, #1d4ed8 100%)',
-          borderRadius: 18, padding: '18px 20px', marginBottom: 14, color: '#fff',
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        }}>
-          <div>
-            <p style={{ fontSize: 12, opacity: 0.8, marginBottom: 4 }}>Total Expense</p>
-            <p style={{ fontSize: 34, fontWeight: 800, lineHeight: 1 }}>
-              Rs. {parseFloat(trip.expense_amount || 0).toFixed(0)}
-            </p>
+        {/* Distance card */}
+        {km != null && (
+          <div style={{
+            background: 'linear-gradient(135deg, #1e40af 0%, #1d4ed8 100%)',
+            borderRadius: 18, padding: '18px 20px', marginBottom: 14, color: '#fff',
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          }}>
+            <div>
+              <p style={{ fontSize: 12, opacity: 0.8, marginBottom: 4 }}>Distance Travelled</p>
+              <p style={{ fontSize: 34, fontWeight: 800, lineHeight: 1 }}>
+                {parseFloat(km).toFixed(1)}
+                <span style={{ fontSize: 18, fontWeight: 600, opacity: 0.8 }}> km</span>
+              </p>
+            </div>
           </div>
-          <div style={{ textAlign: 'right' }}>
-            {km != null && (
-              <>
-                <p style={{ fontSize: 22, fontWeight: 700 }}>{parseFloat(km).toFixed(1)}</p>
-                <p style={{ fontSize: 11, opacity: 0.7 }}>km traveled</p>
-              </>
-            )}
-          </div>
-        </div>
+        )}
 
         {/* Route map */}
         {hasMap && (
@@ -204,11 +186,10 @@ export default function TripDetail() {
         {/* Trip details card */}
         <div style={{ background: '#fff', borderRadius: 18, overflow: 'hidden', marginBottom: 14, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
           {[
-            trip.vehicle_name && { label: 'Vehicle', value: trip.vehicle_name },
+            trip.start_address && { label: 'Start Location', value: trip.start_address },
+            trip.end_address && { label: 'End Location', value: trip.end_address },
             trip.start_odometer != null && { label: 'Start Odometer', value: `${parseFloat(trip.start_odometer).toLocaleString()} km` },
             trip.end_odometer != null && { label: 'End Odometer', value: `${parseFloat(trip.end_odometer).toLocaleString()} km` },
-            trip.fuel_expense_amount > 0 && { label: 'Fuel Expense', value: `Rs. ${parseFloat(trip.fuel_expense_amount).toFixed(0)}` },
-            trip.fuel_liters && { label: 'Fuel', value: `${trip.fuel_liters} L${trip.fuel_type ? ` (${trip.fuel_type})` : ''}` },
           ].filter(Boolean).map((row, i, arr) => (
             <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '13px 16px', borderBottom: i < arr.length - 1 ? '1px solid #f1f5f9' : 'none' }}>
               <span style={{ fontSize: 13, color: '#94a3b8' }}>{row.label}</span>
@@ -220,13 +201,10 @@ export default function TripDetail() {
         {/* Manager note */}
         {trip.manager_notes && (
           <div style={{
-            background: trip.status === 'approved' ? '#f0fdf4' : '#fef2f2',
-            border: `1px solid ${trip.status === 'approved' ? '#bbf7d0' : '#fecaca'}`,
+            background: '#f8fafc', border: '1px solid #e2e8f0',
             borderRadius: 14, padding: '12px 16px', marginBottom: 14,
           }}>
-            <p style={{ fontSize: 12, fontWeight: 700, color: trip.status === 'approved' ? '#16a34a' : '#dc2626', marginBottom: 4 }}>
-              Manager Note
-            </p>
+            <p style={{ fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 4 }}>Manager Note</p>
             <p style={{ fontSize: 14, color: '#374151', lineHeight: 1.5 }}>{trip.manager_notes}</p>
           </div>
         )}

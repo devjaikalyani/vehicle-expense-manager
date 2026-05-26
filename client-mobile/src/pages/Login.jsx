@@ -123,8 +123,8 @@ export default function Login() {
             <circle cx="18.5" cy="18.5" r="2.5" />
           </svg>
         </div>
-        <h1 style={{ color: '#fff', fontSize: 22, fontWeight: 700, margin: 0 }}>VEM Field</h1>
-        <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, marginTop: 4 }}>Vehicle Expense Manager</p>
+        <h1 style={{ color: '#fff', fontSize: 22, fontWeight: 700, margin: 0 }}>EVM Field</h1>
+        <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, marginTop: 4 }}>Employee Vehicle Manager</p>
       </div>
 
       {/* Card */}

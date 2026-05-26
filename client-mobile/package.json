@@ -1,5 +1,5 @@
 {
-  "name": "vem-mobile",
+  "name": "evm-mobile",
   "private": true,
   "version": "1.0.0",
   "type": "module",
@@ -12,7 +12,8 @@
     "leaflet": "^1.9.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^6.26.0"
+    "react-router-dom": "^6.26.0",
+    "socket.io-client": "^4.8.3"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.1",

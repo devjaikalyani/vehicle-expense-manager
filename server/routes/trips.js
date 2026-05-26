@@ -5,16 +5,32 @@ const { sendPushToUser } = require('./push');
 
 const router = express.Router();
 
-const DEFAULT_RATE = { two_wheeler: 6, four_wheeler: 12, other: 8 };
+function haversineKm(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
 
-async function getEmployeeRate(userId, vehicleType) {
-  const result = await db.query(
-    'SELECT custom_rate_inr_per_km FROM users WHERE id = $1',
-    [userId]
+async function calcGpsKmFromTracks(tripId) {
+  const r = await db.query(
+    'SELECT latitude, longitude FROM gps_tracks WHERE trip_id = $1 ORDER BY timestamp ASC',
+    [tripId]
   );
-  const custom = result.rows[0]?.custom_rate_inr_per_km;
-  if (custom != null) return parseFloat(custom);
-  return DEFAULT_RATE[vehicleType] ?? DEFAULT_RATE.other;
+  const pts = r.rows;
+  if (pts.length < 2) return null;
+  let km = 0;
+  for (let i = 1; i < pts.length; i++) {
+    const d = haversineKm(
+      parseFloat(pts[i - 1].latitude), parseFloat(pts[i - 1].longitude),
+      parseFloat(pts[i].latitude), parseFloat(pts[i].longitude)
+    );
+    if (d < 0.5) km += d; // ignore jumps over 500 m (GPS noise)
+  }
+  return Math.round(km * 100) / 100;
 }
 
 router.post('/start', authenticateToken, async (req, res) => {
@@ -39,15 +55,10 @@ router.post('/start', authenticateToken, async (req, res) => {
 });
 
 router.post('/end/:id', authenticateToken, async (req, res) => {
-  const {
-    end_odometer, end_lat, end_lng, end_address, gps_distance_km,
-    fuel_expense_amount, fuel_liters, fuel_type,
-  } = req.body;
+  const { end_odometer, end_lat, end_lng, end_address, gps_distance_km } = req.body;
   try {
     const tripResult = await db.query(
-      `SELECT t.*, v.type AS vehicle_type
-       FROM trips t LEFT JOIN vehicles v ON t.vehicle_id = v.id
-       WHERE t.id = $1 AND t.employee_id = $2`,
+      'SELECT * FROM trips WHERE id = $1 AND employee_id = $2',
       [req.params.id, req.user.id]
     );
     const trip = tripResult.rows[0];
@@ -59,23 +70,19 @@ router.post('/end/:id', authenticateToken, async (req, res) => {
         ? Math.max(0, parseFloat(end_odometer) - parseFloat(trip.start_odometer))
         : null;
 
-    const distance = manual_km ?? parseFloat(gps_distance_km ?? 0);
-    const rate = await getEmployeeRate(req.user.id, trip.vehicle_type);
-    const km_expense = Math.round(distance * rate * 100) / 100;
-    const fuel_exp = parseFloat(fuel_expense_amount || 0);
-    const expense_amount = Math.round((km_expense + fuel_exp) * 100) / 100;
+    // Use client-provided GPS km, or fall back to server-side calculation from stored tracks
+    const resolvedGpsKm =
+      gps_distance_km != null && parseFloat(gps_distance_km) > 0
+        ? parseFloat(gps_distance_km)
+        : await calcGpsKmFromTracks(req.params.id);
 
     const result = await db.query(
       `UPDATE trips
        SET end_time = NOW(), end_odometer = $1, end_lat = $2, end_lng = $3, end_address = $4,
-           manual_distance_km = $5, gps_distance_km = $6, expense_amount = $7,
-           fuel_expense_amount = $8, fuel_liters = $9, fuel_type = $10,
-           status = 'pending'
-       WHERE id = $11 RETURNING *`,
+           manual_distance_km = $5, gps_distance_km = $6, status = 'pending'
+       WHERE id = $7 RETURNING *`,
       [end_odometer || null, end_lat || null, end_lng || null, end_address || null,
-       manual_km, gps_distance_km || null, expense_amount,
-       fuel_exp > 0 ? fuel_exp : 0, fuel_liters || null, fuel_type || null,
-       req.params.id]
+       manual_km, resolvedGpsKm, req.params.id]
     );
     if (req.liveLocations) {
       req.liveLocations.delete(String(req.user.id));
@@ -161,7 +168,7 @@ router.patch('/:id/approve', authenticateToken, requireManager, async (req, res)
     const trip = result.rows[0];
     sendPushToUser(trip.employee_id, {
       title: 'Trip Approved',
-      body: `Your trip "${trip.purpose || 'Trip'}" of Rs.${parseFloat(trip.expense_amount || 0).toFixed(0)} has been approved.`,
+      body: `Your trip "${trip.purpose || 'Trip'}" has been approved.`,
     });
     res.json(trip);
   } catch (err) {
@@ -194,6 +201,9 @@ router.patch('/bulk-action', authenticateToken, requireManager, async (req, res)
   const { tripIds, action, manager_notes } = req.body;
   if (!Array.isArray(tripIds) || tripIds.length === 0) {
     return res.status(400).json({ error: 'tripIds[] is required' });
+  }
+  if (tripIds.length > 100) {
+    return res.status(400).json({ error: 'Max 100 trips per bulk action' });
   }
   if (!['approve', 'reject'].includes(action)) {
     return res.status(400).json({ error: 'action must be approve or reject' });

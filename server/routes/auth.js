@@ -17,6 +17,14 @@ const otpLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: { error: 'Too many login attempts. Please wait 15 minutes before trying again.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // In-memory OTP store: email -> { otp, expiry }
 const otpStore = new Map();
 // In-memory verified store: token -> { email, expiry }
@@ -113,7 +121,7 @@ async function sendZohoMail(to, subject, html) {
   });
 }
 
-router.post('/login', async (req, res) => {
+router.post('/login', loginLimiter, async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
   try {
@@ -127,7 +135,7 @@ router.post('/login', async (req, res) => {
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
-    res.cookie('vem_token', token, {
+    res.cookie('evm_token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
@@ -142,7 +150,7 @@ router.post('/login', async (req, res) => {
 });
 
 router.post('/logout', (_req, res) => {
-  res.clearCookie('vem_token');
+  res.clearCookie('evm_token');
   res.json({ ok: true });
 });
 
@@ -173,7 +181,6 @@ router.post('/send-otp', otpLimiter, async (req, res) => {
         port: 465,
         secure: true,
         auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-        tls: { rejectUnauthorized: false },
       });
       await transporter.sendMail({ from: process.env.SMTP_FROM, to: email, subject: 'Your OTP - Vehicle Expense Manager', html: otpHtml });
     }
@@ -250,7 +257,7 @@ router.post('/reset-password', async (req, res) => {
 router.get('/me', authenticateToken, async (req, res) => {
   try {
     const result = await db.query(
-      'SELECT id, name, email, role, employee_code, phone FROM users WHERE id = $1',
+      'SELECT id, name, email, role, employee_code, phone, custom_rate_inr_per_km FROM users WHERE id = $1',
       [req.user.id]
     );
     res.json(result.rows[0]);

@@ -1,4 +1,4 @@
-const KEY = 'vem_gps_queue';
+const KEY = 'evm_gps_queue';
 
 function load() {
   try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch { return []; }

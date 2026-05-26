@@ -165,7 +165,7 @@ export default function Login() {
             background: 'linear-gradient(135deg, #6366f1, #7c3aed, #8b5cf6)',
             WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
           }}>
-            Vehicle Expense Manager
+            Employee Vehicle Manager
           </h1>
           <p style={{ color: '#94a3b8', fontSize: '0.875rem', marginTop: '0.4rem' }}>
             {view === 'login' ? 'Sign in to your account' : modeSubtitle}
